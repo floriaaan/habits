@@ -13,7 +13,7 @@ pub struct ExternalIdentity {
     pub subject: String,
 }
 
-/// User metadata; provisioning is not implemented in this iteration.
+/// User metadata; identities are provisioned by the local CLI or verified OIDC.
 #[derive(Clone, Debug)]
 pub struct User {
     pub id: UserId,

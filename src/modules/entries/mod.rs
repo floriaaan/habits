@@ -32,7 +32,7 @@ pub enum EntryOperation {
     Cancel,
 }
 
-/// Corrections/cancellations are contracts only; only Create is produced today.
+/// Immutable operations used to replay realizations and their corrections.
 #[derive(Clone, Debug)]
 pub struct EntryEvent {
     pub id: Uuid,

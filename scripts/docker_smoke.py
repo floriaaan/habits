@@ -9,9 +9,21 @@ import subprocess
 import urllib.error
 import urllib.request
 import uuid
+from datetime import datetime, timezone
 
 project = "habits-smoke-" + uuid.uuid4().hex[:12]
 environment = dict(os.environ, COMPOSE_PROJECT_NAME=project, HOST_PORT="0")
+# Never inherit real provider settings or credentials into a smoke deployment.
+for variable in [
+    "OIDC_ISSUER", "OIDC_AUDIENCE", "OIDC_JWKS_URL", "OIDC_ALLOWED_ALGORITHMS",
+    "OIDC_ACCESS_TOKEN_TYP", "ENCRYPTION_KEY", "ENCRYPTION_KEY_ID",
+    "STRAVA_CLIENT_ID", "STRAVA_CLIENT_SECRET", "STRAVA_REDIRECT_URI",
+    "STRAVA_WEBHOOK_VERIFY_TOKEN", "STRAVA_WEBHOOK_PATH_TOKEN", "STRAVA_SUBSCRIPTION_ID",
+    "STRAVA_ATHLETE_CAPACITY", "STRAVA_MULTI_ATHLETE_APPROVED",
+    "HOME_ASSISTANT_URL", "HOME_ASSISTANT_ALLOW_HTTP",
+]:
+    environment[variable] = ""
+environment["AUTH_MODE"] = "disabled"
 
 
 def compose(*arguments):
@@ -41,8 +53,31 @@ try:
         assert response.code == 401
         assert json.load(response)["error"]["code"] == "unauthorized"
     assert compose("exec", "-T", "api", "id", "-u").strip() == "10001"
-    # Real snapshot, then restore while the application is stopped. No user fixture
-    # enters the runtime image; user/entry data restoration is covered by Rust tests.
+    # Bootstrap via the real CLI, then activate token-protected local mode.
+    issued = json.loads(compose("exec", "-T", "api", "/usr/local/bin/habit-tracker", "bootstrap-local", "UTC"))
+    token = issued["token"]
+    environment["AUTH_MODE"] = "local"
+    compose("up", "--detach", "--wait", "--wait-timeout", "90")
+    url = "http://" + compose("port", "api", "8080").strip()
+
+    def api(path, method="GET", payload=None, key=None):
+        headers = {"Authorization": "Bearer " + token, "Content-Type": "application/json"}
+        if key:
+            headers["Idempotency-Key"] = key
+        request = urllib.request.Request(url + path, method=method, headers=headers,
+                                         data=None if payload is None else json.dumps(payload).encode())
+        with urllib.request.urlopen(request, timeout=5) as response:
+            return json.load(response)
+
+    habit = api("/api/v1/habits", "POST", {
+        "name": "Docker smoke", "kind": "boolean", "unit": "count", "target": 1, "timezone": "UTC",
+    })
+    entry_path = "/api/v1/habits/" + habit["id"] + "/entries"
+    payload = {"occurred_at": datetime.now(timezone.utc).isoformat(), "value": 1}
+    entry = api(entry_path, "POST", payload, "docker-smoke-entry")
+    assert api(entry_path, "POST", payload, "docker-smoke-entry")["id"] == entry["id"]
+    assert api("/api/v1/gamification")["xp"] == 10
+    # Snapshot and restore a real authenticated entry and its XP ledger.
     compose("exec", "-T", "api", "/usr/local/bin/habit-tracker", "backup", "/data/smoke-backup.sqlite")
     assert "ok" in compose("exec", "-T", "api", "sqlite3", "/data/smoke-backup.sqlite", "PRAGMA quick_check;")
     compose("stop", "api")
@@ -52,9 +87,13 @@ try:
     address = compose("port", "api", "8080").strip()
     with urllib.request.urlopen("http://" + address + "/health/ready", timeout=5) as response:
         assert response.status == 200
+    url = "http://" + address
+    assert api("/api/v1/entries/" + entry["id"])["id"] == entry["id"]
+    assert api("/api/v1/gamification")["xp"] == 10
     logs = compose("logs", "--no-color", "api")
     assert "API listening" in logs and "request completed" in logs
     assert "smoke-test" not in logs  # Token must not appear in tracing output.
-    print("Docker smoke: OK (health/auth/non-root/read-only/logs/backup/restore)")
+    assert token not in logs
+    print("Docker smoke: OK (health/closed-auth/local-PAT/check-in/idempotence/XP/non-root/read-only/logs/backup/restore)")
 finally:
     compose("down", "--volumes", "--remove-orphans")

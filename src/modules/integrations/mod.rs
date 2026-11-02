@@ -4,13 +4,21 @@ pub mod strava;
 use crate::modules::users::UserId;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use uuid::Uuid;
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Provider {
     Strava,
     HomeAssistant,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct IntegrationInfo {
+    pub id: Uuid,
+    pub provider: Provider,
+    pub connected: bool,
 }
 
 /// Metadata only. No plaintext credentials belong in a domain record.

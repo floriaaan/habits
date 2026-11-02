@@ -220,7 +220,7 @@ async fn vertical_http_flow_isolates_habits_and_entries() {
     );
     assert_eq!(fixture.count("entries").await, 1);
     assert_eq!(fixture.count("entry_events").await, 1);
-    assert_eq!(fixture.count("xp_ledger").await, 0);
+    assert_eq!(fixture.count("xp_ledger").await, 1);
 }
 
 #[tokio::test]

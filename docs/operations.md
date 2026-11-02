@@ -36,8 +36,7 @@ la perte de disque.
 
 Rétention définie : 7 snapshots quotidiens et 4 hebdomadaires hors hôte ; supprimer
 les copies locales après transfert vérifié. Ordonnancement et purge à configurer
-dans l'outil d'exploitation, pas dans un worker fictif. Les secrets chiffrés
-futurs nécessiteront la conservation séparée des clés et identifiants de version.
+dans l'outil d'exploitation, pas dans un worker fictif. Les secrets chiffrés nécessitent la conservation séparée des clés et identifiants de version. Une sauvegarde SQLite seule ne suffit pas pour déchiffrer les connecteurs.
 Une suppression de données doit aussi être appliquée aux sauvegardes à échéance
 de cette rétention ; ne pas remettre en ligne une ancienne copie sans appliquer
 les suppressions/revocations intervenues après le snapshot.
@@ -75,9 +74,30 @@ Les request IDs reçus ne sont pas reflétés, un UUID serveur est généré.
 
 Liveness ne teste pas la base ; readiness vérifie une requête SQLite après
 migrations. Une panne HA/Strava ne modifie aucun healthcheck. Budget global
-120 requêtes/s, 64 en cours, 10 s par requête, JSON 16 KiB. Le quota global
-protège le socle fermé ; ajouter des quotas par identité lors de l'auth.
+120 requêtes/s, 64 en cours, 10 s par requête, JSON 16 KiB. Le quota HTTP est global ; les quotas par identité restent à ajouter.
 
 Avant chaque publication : fmt, clippy, tests, build release, audit/deny, smoke
 Docker ; revoir images, toolchain, licences et dépendances natives. Le scan d'image
 ne remplace pas ces tests et doit également être opéré périodiquement.
+
+## Authentification et jobs
+
+Voir [auth.md](auth.md) pour activer le mode local ou OIDC. Le mode disabled
+reste fermé, même pour un PAT valide. Ne pas journaliser les valeurs env ou la
+sortie du bootstrap ; Docker inspect/config peut exposer les envvars aux personnes
+ayant accès au moteur. Sauvegarder ENCRYPTION_KEY/ENCRYPTION_KEY_ID séparément.
+La ré-encryption des credentials et la rotation de clé ne sont pas automatisées :
+ne pas changer la clé en place sans migration contrôlée ou reconnexion des providers.
+
+Le worker n'est lancé que si Strava ou HA est configuré. Les jobs SQLite prennent
+un bail de 60 s et un propriétaire unique ; les transactions d'import/purge et
+pagination refusent un propriétaire expiré. Une reprise récupère les baux échus.
+Huit essais maximum, backoff exponentiel borné à 6 h, Retry-After provider respecté.
+La file est bornée à 1000 jobs pending/running par utilisateur. Les payloads Strava
+terminés sont effacés, leur empreinte assure toujours l'idempotence. Un arrêt
+pendant un appel HA peut conduire à un rejeu ; notification_id stable remplace
+la notification plutôt que d'en créer une autre.
+
+Les logs donnent des catégories d'erreur sans payload/token/URL. GET /api/v1/jobs/{id}
+expose l'état à son propriétaire ; les métriques, alertes et relances administratives
+des jobs échoués restent à outiller. La readiness n'attend jamais les providers.

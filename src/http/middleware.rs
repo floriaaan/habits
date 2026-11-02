@@ -92,6 +92,7 @@ impl ApiError {
 impl From<DomainError> for ApiError {
     fn from(value: DomainError) -> Self {
         match value {
+            DomainError::Unauthenticated => Self::status(StatusCode::UNAUTHORIZED),
             DomainError::Validation(message) => Self::validation(message),
             DomainError::NotFound => Self::status(StatusCode::NOT_FOUND),
             DomainError::Forbidden => Self::status(StatusCode::FORBIDDEN),
@@ -125,6 +126,61 @@ impl IntoResponse for ApiError {
 /// Production gate: deliberately ignores Authorization and untrusted identity headers.
 pub async fn deny_private(_request: Request, _next: Next) -> Response {
     ApiError::status(StatusCode::UNAUTHORIZED).into_response()
+}
+
+pub async fn authenticate(
+    State((store, mode, oidc)): State<(
+        crate::infrastructure::database::Store,
+        crate::config::AuthMode,
+        Option<std::sync::Arc<crate::infrastructure::security::oidc::OidcVerifier>>,
+    )>,
+    mut request: Request,
+    next: Next,
+) -> Response {
+    if mode == crate::config::AuthMode::Disabled {
+        return ApiError::status(StatusCode::UNAUTHORIZED).into_response();
+    }
+    let credentials = request.headers().get_all(header::AUTHORIZATION);
+    if credentials.iter().count() != 1 {
+        return ApiError::status(StatusCode::UNAUTHORIZED).into_response();
+    }
+    let token = credentials
+        .iter()
+        .next()
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.split_once(' '))
+        .filter(|(scheme, _)| scheme.eq_ignore_ascii_case("bearer"))
+        .map(|(_, token)| token);
+    let Some(token) = token else {
+        return ApiError::status(StatusCode::UNAUTHORIZED).into_response();
+    };
+    let identity = match mode {
+        crate::config::AuthMode::Disabled => Err(DomainError::Unauthenticated),
+        crate::config::AuthMode::Tokens => store.authenticate_local_token(token).await,
+        crate::config::AuthMode::Oidc => {
+            if token.starts_with("ht_") {
+                store.authenticate_token(token).await
+            } else if let Some(verifier) = oidc {
+                match verifier.verify(token).await {
+                    Ok(identity) => {
+                        store
+                            .oidc_principal(&identity.issuer, &identity.subject, identity.scopes)
+                            .await
+                    }
+                    Err(error) => Err(error),
+                }
+            } else {
+                Err(DomainError::Unauthenticated)
+            }
+        }
+    };
+    match identity {
+        Ok(actor) => {
+            request.extensions_mut().insert(actor);
+            next.run(request).await
+        }
+        Err(error) => ApiError::from(error).into_response(),
+    }
 }
 
 pub async fn boundary(

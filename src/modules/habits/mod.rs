@@ -4,7 +4,7 @@ use crate::modules::{
     schedules::Schedule,
     users::UserId,
 };
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use chrono_tz::Tz;
 use serde::{Deserialize, Serialize};
 use std::future::Future;
@@ -29,9 +29,32 @@ pub enum Unit {
     Milliliters,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Period {
+    #[default]
+    Daily,
+    Weekly,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct HabitVersion {
+    pub effective_from: NaiveDate,
+    pub definition: NewHabit,
+}
+
+#[derive(Clone, Debug, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct UpdateHabit {
+    pub effective_from: NaiveDate,
+    pub definition: NewHabit,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct NewHabit {
+    #[serde(default)]
+    pub period: Period,
     pub name: String,
     pub kind: HabitKind,
     pub unit: Unit,
@@ -82,6 +105,37 @@ pub struct Habit {
     #[serde(flatten)]
     pub definition: NewHabit,
     pub created_at: DateTime<Utc>,
+    pub archived_at: Option<DateTime<Utc>>,
+}
+
+impl UpdateHabit {
+    pub fn validate(&self, current: &Habit, today: NaiveDate) -> Result<(), DomainError> {
+        self.definition.validate()?;
+        if self.effective_from <= today || self.effective_from > today + chrono::Duration::days(366)
+        {
+            return Err(DomainError::Validation(
+                "changes take effect on a future local date within 366 days",
+            ));
+        }
+        let old = &current.definition;
+        if old.kind != self.definition.kind
+            || old.unit != self.definition.unit
+            || old.timezone != self.definition.timezone
+            || old.period != self.definition.period
+        {
+            return Err(DomainError::Validation(
+                "kind, unit, timezone and period are immutable; create another habit",
+            ));
+        }
+        if old.period == Period::Weekly
+            && chrono::Datelike::weekday(&self.effective_from) != chrono::Weekday::Mon
+        {
+            return Err(DomainError::Validation(
+                "weekly changes take effect on an ISO Monday",
+            ));
+        }
+        Ok(())
+    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, ToSchema)]

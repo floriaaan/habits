@@ -22,6 +22,12 @@ Toolchain stable : Rust 1.99.1, manifeste officiel daté 2026-10-15.
 | [thiserror](https://crates.io/crates/thiserror/2.0.21) | 2.0.21 | 1.77 |
 | [tempfile](https://crates.io/crates/tempfile/3.27.0) | 3.27.0 | 1.63 |
 | [http-body-util](https://crates.io/crates/http-body-util/0.1.5) | 0.1.5 | 1.61 |
+| [sha2](https://crates.io/crates/sha2/0.11.1) | 0.11.1 | 1.88 |
+| [getrandom](https://crates.io/crates/getrandom/0.4.3) | 0.4.3 | 1.85 |
+| [base64](https://crates.io/crates/base64/0.23.1) | 0.23.1 | 1.71.0 |
+| [aes-gcm](https://crates.io/crates/aes-gcm/0.11.1) | 0.11.1 | 1.85 |
+| [zeroize](https://crates.io/crates/zeroize/1.9.1) | 1.9.1 | 1.85 |
+| [jsonwebtoken](https://crates.io/crates/jsonwebtoken/11.1.0) | 11.1.0 | 1.88.0 |
 
 Cargo.lock fixe aussi les transitives. Les écarts de versions transitives sont
 inspectés par cargo audit et cargo deny ; aucun advisory ignoré par défaut.
@@ -41,7 +47,9 @@ sans ignorer un advisory, et copiée dans `licenses/` ainsi que l'image runtime.
 
 Doublons transitifs revus et laissés visibles comme avertissements : base64
 0.22/0.23 (SQLx/Reqwest), hashbrown 0.16/0.17 (hashlink/indexmap), syn 2/3
-(macros de différentes générations), tower-http 0.6/0.7 (Reqwest/application).
+(macros de différentes générations), tower-http 0.6/0.7 (Reqwest/application),
+block-buffer 0.10/0.12, cpufeatures 0.2/0.3, crypto-common 0.1/0.2, digest 0.10/0.11,
+sha2 0.10/0.11 (SQLx/RustCrypto actuel), untrusted 0.7/0.9 (aws-lc/rustls-webpki).
 Leurs contraintes semver diffèrent ; ne pas forcer une version incompatible.
 Aucune vulnérabilité RustSec n'est ignorée dans deny.toml.
 

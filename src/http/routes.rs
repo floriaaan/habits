@@ -1,5 +1,5 @@
 use crate::{
-    http::middleware::{ApiError, ErrorEnvelope, TrafficBudget, boundary, deny_private},
+    http::middleware::{ApiError, ErrorEnvelope, TrafficBudget, authenticate, boundary},
     infrastructure::database::Store,
     modules::{
         auth::Principal,
@@ -28,11 +28,36 @@ use utoipa::{
 use uuid::Uuid;
 
 pub fn router(store: Store) -> Router {
-    assemble(store)
+    router_with_auth(store, crate::config::AuthMode::Disabled)
+}
+
+pub fn router_with_auth(store: Store, mode: crate::config::AuthMode) -> Router {
+    assemble(store, mode, None, None)
+}
+
+pub fn router_with_integrations(
+    store: Store,
+    mode: crate::config::AuthMode,
+    runtime: std::sync::Arc<crate::infrastructure::integrations::IntegrationRuntime>,
+) -> Router {
+    assemble(store, mode, Some(runtime), None)
+}
+
+pub fn router_with_identity(
+    store: Store,
+    mode: crate::config::AuthMode,
+    runtime: std::sync::Arc<crate::infrastructure::integrations::IntegrationRuntime>,
+    oidc: Option<std::sync::Arc<crate::infrastructure::security::oidc::OidcVerifier>>,
+) -> Router {
+    assemble(store, mode, Some(runtime), oidc)
 }
 
 fn private_routes() -> Router<Store> {
     Router::new()
+        .merge(super::auth::routes())
+        .merge(super::integrations::private_routes())
+        .merge(super::tracking::routes())
+        .merge(super::tracking::entry_routes())
         .route("/api/v1", get(version))
         .route("/api/v1/openapi.json", get(openapi))
         .route("/api/v1/habits", get(list_habits).post(create_habit))
@@ -43,13 +68,29 @@ fn private_routes() -> Router<Store> {
         .route("/api/v1/entries/{entry_id}", get(get_entry))
 }
 
-fn assemble(store: Store) -> Router {
-    let private = private_routes().layer(middleware::from_fn(deny_private));
-    Router::new()
+fn assemble(
+    store: Store,
+    mode: crate::config::AuthMode,
+    runtime: Option<std::sync::Arc<crate::infrastructure::integrations::IntegrationRuntime>>,
+    oidc: Option<std::sync::Arc<crate::infrastructure::security::oidc::OidcVerifier>>,
+) -> Router {
+    let private = private_routes().layer(middleware::from_fn_with_state(
+        (store.clone(), mode, oidc),
+        authenticate,
+    ));
+    let router = Router::new()
         .merge(private)
         .route("/health/live", get(live))
         .route("/health/ready", get(ready))
-        .fallback(|| async { ApiError::status(StatusCode::NOT_FOUND) })
+        .fallback(|| async { ApiError::status(StatusCode::NOT_FOUND) });
+    let router = if let Some(runtime) = runtime {
+        router
+            .merge(super::integrations::public_routes())
+            .layer(Extension(runtime))
+    } else {
+        router
+    };
+    router
         .with_state(store)
         .layer(DefaultBodyLimit::max(16 * 1024))
         .layer(ConcurrencyLimitLayer::new(64))
@@ -98,7 +139,7 @@ async fn version() -> Json<Version> {
     })
 }
 
-fn json<T>(value: Result<Json<T>, JsonRejection>) -> Result<T, ApiError> {
+pub(super) fn json<T>(value: Result<Json<T>, JsonRejection>) -> Result<T, ApiError> {
     value.map(|Json(value)| value).map_err(|error| {
         if error.status() == StatusCode::PAYLOAD_TOO_LARGE {
             ApiError::status(StatusCode::PAYLOAD_TOO_LARGE)
@@ -107,12 +148,14 @@ fn json<T>(value: Result<Json<T>, JsonRejection>) -> Result<T, ApiError> {
         }
     })
 }
-fn page(value: Result<Query<Pagination>, QueryRejection>) -> Result<Pagination, ApiError> {
+pub(super) fn page(
+    value: Result<Query<Pagination>, QueryRejection>,
+) -> Result<Pagination, ApiError> {
     value
         .map(|Query(value)| value)
         .map_err(|_| ApiError::validation("invalid pagination query"))
 }
-fn identifier(value: Result<Path<Uuid>, PathRejection>) -> Result<Uuid, ApiError> {
+pub(super) fn identifier(value: Result<Path<Uuid>, PathRejection>) -> Result<Uuid, ApiError> {
     value
         .map(|Path(value)| value)
         .map_err(|_| ApiError::validation("path identifier must be a UUID"))
@@ -206,7 +249,7 @@ impl Modify for Security {
                     HttpBuilder::new()
                         .scheme(HttpAuthScheme::Bearer)
                         .description(Some(
-                            "Contract only: runtime refuses all private requests in iteration 1",
+                            "Opaque PAT or service-account token; enable AUTH_MODE=tokens. Disabled mode refuses all private requests.",
                         ))
                         .build(),
                 ),
@@ -216,7 +259,7 @@ impl Modify for Security {
 }
 
 #[derive(OpenApi)]
-#[openapi(info(title = "Habit Tracker", version = "0.1.0", description = "Iteration 1: all private routes fail closed until authentication is implemented. Global errors: 429 rate limit, 504 deadline. Max JSON body: 16384 bytes."), paths(live, ready, version, openapi, create_habit, list_habits, record_entry, list_entries, get_entry), components(schemas(ErrorEnvelope, Health, Version, NewHabit, Habit, HabitPage, NewEntry, Entry, EntryPage)), modifiers(&Security))]
+#[openapi(info(title = "Habit Tracker", version = "0.1.0", description = "Configurable authentication: disabled rejects private requests; local accepts the default user PAT/service-account tokens; oidc verifies RFC 9068 access tokens and tenant-scoped PATs. Global errors: 429 rate limit, 504 deadline. Max JSON body: 16384 bytes."), paths(live, ready, version, openapi, create_habit, list_habits, record_entry, list_entries, get_entry, super::auth::create, super::auth::list, super::auth::revoke, super::auth::rotate, super::auth::service, super::auth::revoke_service, super::tracking::habit, super::tracking::update, super::tracking::archive, super::tracking::versions, super::tracking::rests, super::tracking::rest, super::tracking::unrest, super::tracking::statistics, super::tracking::recalculate, super::tracking::correct, super::tracking::cancel, super::tracking::gamification, super::tracking::ledger, super::integrations::list, super::integrations::connect_ha, super::integrations::notify, super::integrations::authorize, super::integrations::mapping, super::integrations::sync, super::integrations::disconnect, super::integrations::job, super::integrations::callback, super::integrations::challenge, super::integrations::webhook), components(schemas(ErrorEnvelope, Health, Version, NewHabit, Habit, HabitPage, NewEntry, Entry, EntryPage)), modifiers(&Security))]
 pub struct ApiDoc;
 
 #[cfg(test)]

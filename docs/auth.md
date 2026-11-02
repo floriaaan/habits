@@ -1,80 +1,127 @@
-# Contrats d'identité — bloquants avant ouverture de l'API
+# Authentification configurable
 
-Le seul mode actif est `AUTH_MODE=disabled` : toutes les routes `/api/v1`
-retournent 401, même avec un token. Aucun en-tête reverse-proxy (`X-User-Id`,
-`X-Forwarded-*`) n'est une authentification. Le middleware de test est compilé
-uniquement avec `cfg(test)`, sans feature/env de développement activable.
-Les services contrôlent les scopes séparément ; les adaptateurs SQLite filtrent
-chaque opération par user_id et vérifient la propriété de l'objet parent.
+`AUTH_MODE=disabled` est le défaut : toutes les routes `/api/v1` répondent 401,
+même avec un token. Les healthchecks et les endpoints OAuth/webhook dédiés suivent
+leurs propres règles. Aucun en-tête d'identité fourni par un proxy ne confère de
+droits. NPMplus termine HTTPS ; garder `/health/*` internes.
 
-## JWT access token OIDC Pocket ID
+## Mode local sans Pocket ID
 
-À faire confirmer par le mainteneur, sans fournir ici de valeurs réelles :
+`AUTH_MODE=local` (alias `tokens`) accepte uniquement les PAT et tokens de comptes
+de service du tenant singleton `(urn:habit-tracker:local, default)`. L'UUID est
+persisté en SQLite ; aucun utilisateur anonyme ni secret admin permanent n'est
+créé. Le serveur provisionne ce tenant à son premier démarrage, sans token.
 
-1. Version/configuration Pocket ID et capacité à émettre un **JWT access token
-   destiné à cette ressource API**. Un ID token destiné à un client OIDC ne
-   satisfait pas ce contrat. Un access token opaque nécessite une décision
-   supplémentaire ; ne pas le décoder comme JWT ni accepter son ID token associé.
-2. `OIDC_ISSUER` exact HTTPS (comparaison byte-for-byte, chemin/slash compris).
-3. `OIDC_AUDIENCE` exact de la ressource, distinct du client web quand nécessaire ;
-   confirmer la forme `aud` string/liste et la politique multi-audience.
-4. `OIDC_JWKS_URL` HTTPS autorisée et document discovery approuvé ; aucun `jku`,
-   `x5u` ni URL arbitraire issu du token ne doit piloter une requête réseau.
-5. `OIDC_ALLOWED_ALGORITHMS` liste explicite asymétrique revue avec les types,
-   tailles et usages des clés ; refuser `none`, confusion HMAC/RSA, clé sans
-   usage signature ou algorithme inattendu.
-6. Profil access token : `OIDC_ACCESS_TOKEN_TYP` (p.ex. `at+jwt` **si confirmé**),
-   ou discriminateur de claims vérifiable documenté. `typ=JWT` seul ne prouve
-   pas qu'un token est un access token. Audience seule insuffisante si le
-   fournisseur émet ID et access tokens avec la même audience.
-7. Exemple de **schéma de claims expurgé**, `sub` stable non vide, `iss`, `aud`,
-   `exp`, `nbf` obligatoires ; durée, clock skew borné, mapping des scopes,
-   approvisionnement utilisateur et politique de désactivation.
+Exécuter le bootstrap local sur la même base que le serveur :
 
-Futur vérificateur : signature et tous les claims ci-dessus, cache JWKS borné,
-rotation sur `kid` inconnu avec rafraîchissement mutualisé et limité, TTL,
-time out et limites de réponse, aucune acceptation d'une clé inconnue pendant
-une panne. Tests clé tournée, cache expiré, wrong issuer/audience/algorithm,
-ID token, exp passé, nbf futur/absent, kid inconnu et panne fournisseur.
-Ne jamais logger Authorization, claims bruts ou token. Une nouvelle identité
-est liée uniquement par `(issuer, subject)`, jamais par email.
+```sh
+cargo run --locked -- bootstrap-local Europe/Paris
+# Ou sur le volume de l'API Compose déjà démarrée :
+docker compose exec api /usr/local/bin/habit-tracker bootstrap-local Europe/Paris
+```
 
-Les envvars OIDC proposées ne sont volontairement pas activables : leur présence
-non vide arrête le démarrage pour éviter une configuration faussement effective.
+Le premier bootstrap applique le fuseau fourni au tenant local, même s'il a été
+provisionné en UTC au démarrage. Chaque habitude porte aussi son propre fuseau IANA. La
+sortie JSON contient le token et ses métadonnées : tous les scopes, expiration
+sous 24 h, secret affiché à l'émission uniquement. Le conserver hors des logs et
+créer ensuite des tokens adaptés aux clients. Répéter le bootstrap est refusé.
+Configurer ensuite `AUTH_MODE=local` pour le processus serveur (avec Compose,
+recréer le service après modification de cette variable).
+La récupération après perte/expiration exige l'accès local à la CLI et l'UUID :
 
-## PAT et service accounts
+```sh
+cargo run --locked -- token-create "${USER_ID:?}" \
+  'habits:read,entries:read,statistics:read' "${EXPIRES_AT:?}"
+```
 
-Contrats préparés : `IdentityMode`, `Principal`, `Scope`, tables service_accounts,
-access_tokens, auth_audit. **Émission et vérification non implémentées.**
+`EXPIRES_AT` est un instant RFC 3339 UTC dans les 365 prochains jours. Les CLI
+`bootstrap-admin ISSUER SUBJECT TIMEZONE` et `user-create ISSUER SUBJECT TIMEZONE`
+existent aussi pour des identités explicites : le premier émet un PAT de 24 h,
+le second renvoie l'UUID. Ces identités ne sont pas acceptées en mode local si
+elles ne correspondent pas au singleton. L'administration n'accorde aucun droit
+global sur les ressources d'autres tenants.
 
-- CLI de bootstrap ponctuelle, locale ; aucun secret admin permanent. Privilège
-  d'administration explicite, jamais un droit global de lecture des habitudes.
-- Token opaque >= 256 bits aléatoires CSPRNG ; affichage une fois lors de création,
-  empreinte SHA-256 de 32 octets uniquement en base. Un hash rapide convient ici
-  car le token n'est pas un mot de passe. Préfixe/id pour audit, jamais secret brut.
-- Scopes `habits:read`, `habits:write`, `entries:read`, `entries:write` avec refus
-  par défaut. Un compte de service reste rattaché à un tenant ; aucun accès global.
-- Expiration obligatoire, révocation vérifiée à chaque accès, rotation atomique
-  révoquant l'ancien et audit sans secret. Suppression/désactivation de l'utilisateur
-  ou du compte de service invalide aussi ses tokens. Quota par principal.
-- Pas de récupération de token ; le remplacer. Tests expiration, révocation,
-  rotation, permissions et isolation avant d'exposer les endpoints.
+## PAT et comptes de service
 
-## Secrets d'intégration
+Toutes les requêtes privées utilisent `Authorization: Bearer …`. Les tokens
+opaques `ht_…` contiennent 256 bits issus du CSPRNG système ; seule leur empreinte
+SHA-256 est stockée. Le secret est renvoyé à l'émission/rotation et n'est jamais
+récupérable par lecture. Chaque accès vérifie expiration, révocation, utilisateur
+actif et, le cas échéant, compte de service actif.
 
-Aucun secret/refresh token n'est accepté ou stocké dans cette itération. Le
-schéma impose des emplacements ciphertext/nonce/key_id, mais ne remplace pas un
-chiffrement effectif. Avant OAuth : implémenter AEAD (AES-256-GCM ou équivalent
-audité), nonce unique aléatoire, AAD tenant/provider/version, clé de 32 octets
-injectée via `ENCRYPTION_KEY` et identifiant `ENCRYPTION_KEY_ID`. Validation stricte,
-Debug expurgé, rotation/reencryption et sauvegarde des anciennes clés nécessaires.
-Ne jamais considérer une simple conversion base64 comme du chiffrement.
+Scopes : `habits:read`, `habits:write`, `entries:read`, `entries:write`,
+`statistics:read`, `integrations:manage`, `notifications:write`, `tokens:manage`.
+Les services vérifient les scopes séparément de l'identité ; la persistance
+filtre les ressources par `user_id` et vérifie les objets parents.
 
-## Réseau
+| Route privée | Comportement |
+| --- | --- |
+| `POST /api/v1/tokens` | Émission PAT ou token de compte de service. |
+| `GET /api/v1/tokens?limit=20&offset=0` | Métadonnées du tenant, sans secret. |
+| `POST /api/v1/tokens/{id}/rotate` | Révocation et remplacement atomiques. |
+| `DELETE /api/v1/tokens/{id}` | Révocation du token du tenant. |
+| `POST /api/v1/service-accounts` | Création d'un compte du tenant. |
+| `DELETE /api/v1/service-accounts/{id}` | Révocation du compte et de ses tokens. |
 
-NPMplus termine HTTPS. Ne publier que `/api/v1/*` lorsque l'auth sera implémentée ;
-interdire `/health/*` à l'extérieur. Aucun CORS permissif ni cookie de session.
-OAuth futur : state à usage unique, PKCE si supporté, callback sur allowlist
-exacte HTTPS, aucune redirection utilisateur arbitraire. Strava webhook : protocole
-de challenge et validation dédié avant toute route publique, réponse rapide,
-déduplication et jobs persistants ; pas de worker simulé dans cette version.
+L'émission exige `tokens:manage`, des scopes connus, distincts et non vides et une
+expiration future limitée à 365 jours. Un appelant ne peut émettre/faire tourner
+un token avec plus de scopes qu'il n'en possède. Un compte de service ne peut
+émettre/faire tourner des tokens ni créer/révoquer des comptes de service. Un
+token doté de `tokens:manage` peut lister/révoquer les tokens de son tenant :
+réserver ce scope à la gestion des accès. La rotation conserve scopes, compte
+associé et expiration.
+
+Créer un compte avec `{"name":"Home Assistant"}`, puis émettre un token avec
+`scopes`, `expires_at` et `service_account_id` égal à son UUID. Pour un PAT,
+`service_account_id` vaut `null`. Créations, rotations, révocations et bootstraps
+alimentent `auth_audit` dans la transaction. Aucun export HTTP de l'audit ni
+journal de chaque authentification n'est encore implémenté.
+
+## OIDC optionnel
+
+L'adaptateur existe ; aucune instance Pocket ID réelle n'a été configurée ou
+validée. Confirmer que le fournisseur émet des **JWT access tokens pour cette
+API** conformes au profil retenu. Un ID token, un access token opaque ou un token
+`typ=JWT` ne satisfait pas ce contrat.
+
+Activer explicitement `AUTH_MODE=oidc` et fournir ces paramètres non secrets :
+
+| Variable | Contrat |
+| --- | --- |
+| `OIDC_ISSUER` | Issuer HTTPS exact, chemin et slash compris. |
+| `OIDC_AUDIENCE` | Audience exacte de la ressource API. |
+| `OIDC_JWKS_URL` | URL HTTPS fixe approuvée par l'opérateur. |
+| `OIDC_ALLOWED_ALGORITHMS` | Liste distincte séparée par virgules parmi `RS256`, `ES256`, `EdDSA`. |
+| `OIDC_ACCESS_TOKEN_TYP` | Obligatoirement `at+jwt`, profil RFC 9068 retenu. |
+
+Issuer/JWKS refusent credentials, query et fragment. Des variables OIDC non vides
+hors de ce mode empêchent le démarrage. Aucun discovery automatique ni endpoint
+de login/callback Pocket ID n'est livré : le client obtient son access token
+auprès du fournisseur, puis le présente à l'API.
+
+Le vérificateur impose signature, algorithme autorisé, `kid`, `typ=at+jwt`, `iss`,
+`aud`, `sub`, `exp`, `nbf`, avec tolérance d'horloge de 30 secondes. Il refuse les
+URLs/clés du header de token, les extensions critiques non prises en charge et
+les headers de chiffrement/compression. Les clés JWKS annoncent usage signature
+et algorithme compatible ; RSA est borné à 2048–8192 bits, ES256 à P-256, EdDSA à
+Ed25519. Seuls les scopes applicatifs connus du claim `scope` sont retenus ; aucun
+droit implicite n'est accordé.
+
+Le cache JWKS dure cinq minutes. Un `kid` inconnu déclenche un rafraîchissement
+mutualisé, limité à un essai toutes les 30 secondes. Réponse limitée à 1 Mio et
+64 clés, timeout de cinq secondes, sans redirection ni proxy d'environnement.
+Une panne n'autorise pas les clés expirées/inconnues. Aucun basculement automatique
+vers le tenant local n'a lieu en cas de panne OIDC.
+
+Les utilisateurs sont provisionnés par `(issuer, subject)`, jamais par email.
+Le mode OIDC accepte aussi les PAT/SA `ht_…` des tenants existants. La désactivation
+locale est vérifiée ; l'introspection/révocation immédiate des JWT auprès du
+fournisseur n'est pas implémentée.
+
+## Vérification et limites
+
+Les tests locaux couvrent isolation, scopes, hash, expiration, rotation/révocation,
+comptes de service, signature/claims et rotation/panne JWKS via HTTP de test.
+Consulter `docs/validation.md` pour les résultats effectivement obtenus. Ces tests
+ne prouvent pas une compatibilité Pocket ID en production. Les secrets des
+connecteurs et leurs limites sont décrits dans [integrations.md](integrations.md).

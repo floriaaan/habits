@@ -7,7 +7,7 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 /// An excluded local date, never a successful completion.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, ToSchema)]
 pub struct RestException {
     pub id: Uuid,
     pub user_id: UserId,

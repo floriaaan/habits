@@ -8,6 +8,23 @@ pub struct Config {
     pub listen_addr: SocketAddr,
     pub database_path: PathBuf,
     pub log_filter: String,
+    pub auth_mode: AuthMode,
+    pub oidc: Option<OidcSettings>,
+}
+
+#[derive(Clone)]
+pub struct OidcSettings {
+    pub issuer: String,
+    pub audience: String,
+    pub jwks_url: String,
+    pub algorithms: Vec<String>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AuthMode {
+    Disabled,
+    Tokens,
+    Oidc,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -31,25 +48,79 @@ impl Config {
         if path.trim().is_empty() || path.contains(['?', '#', '\0']) || path == ":memory:" {
             return Err(ConfigError("DATABASE_PATH must be a local filesystem path"));
         }
-        if get("AUTH_MODE").is_some_and(|mode| mode != "disabled") {
-            return Err(ConfigError(
-                "only AUTH_MODE=disabled is supported; all private requests are refused",
-            ));
-        }
-        for name in [
+        let auth_mode = match get("AUTH_MODE").as_deref().unwrap_or("disabled") {
+            "disabled" => AuthMode::Disabled,
+            "tokens" | "local" => AuthMode::Tokens,
+            "oidc" => AuthMode::Oidc,
+            _ => {
+                return Err(ConfigError(
+                    "AUTH_MODE must be disabled, local (tokens alias) or oidc",
+                ));
+            }
+        };
+        let oidc_names = [
             "OIDC_ISSUER",
             "OIDC_AUDIENCE",
             "OIDC_JWKS_URL",
             "OIDC_ALLOWED_ALGORITHMS",
             "OIDC_ACCESS_TOKEN_TYP",
-        ] {
-            if get(name).is_some_and(|value| !value.is_empty()) {
+        ];
+        let oidc = if auth_mode == AuthMode::Oidc {
+            let required = |name: &str| {
+                get(name).filter(|value|!value.trim().is_empty()).ok_or(ConfigError("OIDC mode requires issuer, audience, HTTPS JWKS, allowed algorithms and access token typ=at+jwt"))
+            };
+            let issuer = required("OIDC_ISSUER")?;
+            let audience = required("OIDC_AUDIENCE")?;
+            let jwks_url = required("OIDC_JWKS_URL")?;
+            let valid_url = |value: &str| {
+                reqwest::Url::parse(value).is_ok_and(|url| {
+                    url.scheme() == "https"
+                        && url.host_str().is_some()
+                        && url.username().is_empty()
+                        && url.password().is_none()
+                        && url.query().is_none()
+                        && url.fragment().is_none()
+                })
+            };
+            let algorithms = required("OIDC_ALLOWED_ALGORITHMS")?
+                .split(',')
+                .map(str::trim)
+                .map(String::from)
+                .collect::<Vec<_>>();
+            if !valid_url(&issuer)
+                || !valid_url(&jwks_url)
+                || audience.len() > 255
+                || audience.chars().any(char::is_control)
+                || required("OIDC_ACCESS_TOKEN_TYP")? != "at+jwt"
+                || algorithms.is_empty()
+                || algorithms
+                    .iter()
+                    .any(|alg| !matches!(alg.as_str(), "RS256" | "ES256" | "EdDSA"))
+            {
                 return Err(ConfigError(
-                    "OIDC is not implemented; see docs/auth.md before enabling a provider",
+                    "invalid OIDC resource-server contract; only HTTPS, at+jwt and RS256/ES256/EdDSA are accepted",
                 ));
             }
-        }
+            Some(OidcSettings {
+                issuer,
+                audience,
+                jwks_url,
+                algorithms,
+            })
+        } else {
+            if oidc_names
+                .iter()
+                .any(|name| get(name).is_some_and(|value| !value.is_empty()))
+            {
+                return Err(ConfigError(
+                    "OIDC variables require explicit AUTH_MODE=oidc",
+                ));
+            }
+            None
+        };
         Ok(Self {
+            auth_mode,
+            oidc,
             listen_addr,
             database_path: path.into(),
             log_filter: get("RUST_LOG")

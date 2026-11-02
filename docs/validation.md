@@ -1,102 +1,101 @@
-# Preuves de validation — 2026-11-02
+# Preuves de validation — itération 2, 2026-11-02
 
-Réalisées dans le dépôt de cette itération ; aucun critère de fonctionnalité
-future n'est déclaré satisfait à partir de tables ou modules vides.
+Environnement : macOS arm64, Rust 1.99.1, Docker/OrbStack Linux arm64.
+Les résultats ci-dessous concernent les commandes locales exécutées ; aucune
+instance Pocket ID/Strava/HA réelle, CI GitHub ou publication GHCR n'est simulée.
 
-## Environnement
-
-- Hôte macOS arm64, toolchain Rust 1.99.1 installée avec rustfmt/clippy.
-- Docker Engine 29.8.2 via OrbStack, images Linux arm64.
-- Versions stables directes vérifiées via crates.io, verrouillées dans Cargo.lock.
-- cargo-audit 0.22.2 et cargo-deny 0.20.2 installés avec `--locked`.
-
-## Commandes exécutées et résultats
+## Contrôles
 
 ```sh
-cargo check --locked
 cargo fmt --all -- --check
 cargo clippy --locked --all-targets --all-features -- -D warnings
 cargo test --locked --all-targets
 cargo build --locked --release
-cargo run --locked -- openapi > /tmp/habits-openapi.json
-diff -u docs/openapi.json /tmp/habits-openapi.json
+cargo run --locked -- openapi > /tmp/openapi.json
+diff -u docs/openapi.json /tmp/openapi.json
 python3 scripts/check_domain_boundaries.py
-docker compose config --quiet
 cargo audit --deny warnings
 cargo deny --locked check
+actionlint
+docker compose config --quiet
 python3 scripts/docker_smoke.py
+git diff --check
 ```
 
-- Check, fmt, clippy : réussis, aucun warning Clippy.
-- Tests : **18 réussis, 0 échec, 0 ignoré** ; tests de bibliothèque/services/HTTP
-  avec vrais fichiers SQLite temporaires, pas de mock de persistance.
-- Release native : réussie ; release Linux arm64 également compilée dans le
-  Dockerfile multi-stage.
-- Export OpenAPI : généré et identique au snapshot `docs/openapi.json`.
-- Frontières domaine : aucun import Axum/SQLx/Reqwest/Tower hors adaptateurs.
-- Compose : configuration valide et démarrage en état healthy.
-- cargo audit : succès, 1402 advisories RustSec chargés, aucun advisory signalé
-  sur les 271 éléments dépendances/paquet scannés, aucun avertissement accepté.
-- cargo deny : advisories/bans/licenses/sources **ok** après revue de la licence
-  CDLA-Permissive-2.0 ; quatre familles de doublons transitifs restent signalées
-  en avertissements (base64/hashbrown/syn/tower-http), documentées dans dependencies.md.
-- Smoke Docker : succès après ajout des notices de licence dans l'image finale ;
-  UID 10001, rootfs readonly, cap_drop ALL, non privileged, aucun socket Docker,
-  healthchecks live/ready, 401 avec faux Bearer et faux en-tête d'identité,
-  logs JSON sans token, snapshot SQLite vérifié, arrêt/restauration/redémarrage.
-  Le projet/volume de smoke est éphémère et a été supprimé après chaque exécution.
+- **51 tests réussis, 0 échec, 0 ignoré** ; SQLite réel temporaire et serveurs
+  HTTP de fixture pour les providers.
+- Fmt et Clippy (warnings refusés) : succès. Release native macOS arm64 : succès.
+- Frontières du domaine, OpenAPI identique au snapshot et actionlint : succès.
+- Compose et smoke Linux arm64 : succès, y compris PAT réel, idempotence/XP,
+  sauvegarde et restauration ; projet/volume éphémère nettoyés.
+- Audit : 1402 advisories chargés, 297 dépendances scannées, sortie zéro et aucun
+  advisory signalé ; aucun advisory ignoré.
+- Deny : advisories/bans/licenses/sources **ok**. Dix familles de versions
+  transitives restent en avertissements, revues dans [dependencies.md](dependencies.md).
+- Les nouvelles versions crypto ont été revérifiées contre les dernières stables
+  crates.io non retirées et leur MSRV, puis compilées avec Cargo.lock.
+- Workflow GHCR vérifié par actionlint et revue des conditions d'événements/tags ;
+  les actions officielles sont fixées par SHA. Le premier run GitHub reste à faire.
 
-Le premier essai de compilation des tests a échoué sur une chaîne SQL dynamique
-du compteur de fixture, interdite par SQLx 0.9 ; elle a été remplacée par des
-requêtes littérales. Les tests ont ensuite été relancés et passent.
-Le premier cargo deny a refusé une licence absente de l'allowlist ; texte revu,
-notice conservée, relance réussie. Aucun contournement de sécurité/advisory.
+## Comportements prouvés localement
 
-## Cas prouvés
+1. Mode disabled fermé même avec un PAT valide, aucun en-tête d'identité accepté ;
+   local limité au tenant singleton stable, bootstrap unique et fuseau explicite.
+2. PAT CSPRNG/hash, scopes non extensibles, expiration, rotation et révocation
+   atomiques ; comptes de service isolés et révocables ; audit sans token clair.
+3. JWT signés de fixture : claims iss/aud/sub/exp/nbf, typ access token, signature,
+   algorithme et paramètres JWK, refus ID token ; cache/rotation/refresh mutualisé,
+   limite d'essais et panne JWKS. Parcours HTTP JWT multi-tenant avec clés en cache.
+4. Isolation objet/scopes des habitudes, entrées, versions, exceptions, statistiques,
+   XP, tokens, mappings, credentials et jobs ; FK composites inter-tenant.
+5. Validation types/unités/valeurs finies, corps/UUID/pagination/champs inconnus,
+   erreurs JSON uniformes et request_id, limites de taille/débit.
+6. Création/rejeu/conflit/concurrence, rollback si événement échoue ; correction et
+   annulation via événements, replay identique sans deuxième attribution d'XP.
+7. Fuseaux IANA, sauts/replis DST, refus des instants sans offset et périodes
+   hebdomadaires ; repos neutres pour taux/streak/XP ; définitions futures conservant
+   l'ancienne cible historique ; compensation lors d'un ajout/retrait de repos.
+8. Migrations répétables sur base vierge et upgrade depuis 0001 avec événements/XP
+   historiques conservés puis compensables ; backup WAL/restauration avec FK valides.
+9. Chiffrement AEAD lié au tenant/provider/version/clé, tampering refusé ; OAuth
+   state hashé à usage unique/TTL et callback échangeant un code avec un serveur local.
+10. Webhook challenge/abonnement, événement minimal durable et rejouage sans doublon ;
+    Strava import/correction/purge avec compensation et retrait des données source.
+11. Quotas observés conservateurs, reprise après huit échecs, lease récupérable et
+    refus des mutations par un worker périmé ; source archivée préservée, snapshots
+    successifs sous un même job, CAS de credentials et pagination à cutoff immuable.
+12. Panne HA avec retry et notification_id stable ; le parcours manuel continue.
+    Providers facultatifs absents : API manuelle utilisable et routes dédiées 503/404.
+13. Docker : UID 10001, rootfs read-only, cap_drop ALL, aucun privilège/socket Docker,
+    live/ready, faux Bearer refusé, CLI bootstrap puis PAT réel, création/check-in,
+    rejeu unique/10 XP, snapshot, arrêt/restauration/redémarrage et données/XP relus.
+    Aucun token dans les logs ; uniquement le projet/volume éphémère du smoke supprimé.
 
-1. Configuration refusant modes d'auth non implémentés et valeurs invalides,
-   adresse de healthcheck conservant la famille IPv4/IPv6 de l'écoute.
-2. Binaire HTTP refusant token absent, Bearer arbitraire et en-têtes usurpés.
-3. Isolation création/listage et lecture/écriture d'entrées ; scopes distincts.
-4. Idempotence identique, conflit de contenu, portée tenant et rejeux concurrents.
-5. Rollback de l'entrée si l'insertion de l'événement échoue.
-6. FK composites refusant les écritures inter-tenant ; migrations répétables,
-   foreign_keys et WAL sur chacune des quatre connexions du pool.
-7. Valeurs finies, noms, unités/types, pagination, champs inconnus, UUID, corps
-   trop volumineux, clé idempotente obligatoire et quota HTTP global.
-8. Date locale Europe/Paris, saut de printemps, heure répétée d'automne,
-   refus de datetime sans offset, fenêtres et exception repos.
-9. Sauvegarde d'une base WAL avec habitudes/entrées, restauration des données,
-   contrôle d'intégrité et FK, refus d'écraser un snapshot existant.
-10. Schémas/routes/sécurité OpenAPI et absence de dépendance à un provider au
-    démarrage ou sur les routes livrées.
+La revue a trouvé et fait corriger quatre défauts de reprise : purge d'une source
+sur habitude archivée, clé d'événement réutilisée sur snapshots modifiés d'un même
+job, effets d'un worker dont le bail a expiré et cutoff de pagination recalculé au
+retry. Des tests ciblés couvrent les quatre. Les compilations intermédiaires
+échouées ont été corrigées et relancées ; aucun échec n'est considéré comme validé.
 
-## Limites explicites
+## Limites et recette externe
 
-- **Aucune route métier utilisable en production avant implémentation de l'auth.**
-  OIDC non implémenté faute de contrat resource/audience/JWKS/profil access token
-  confirmé. PAT/service accounts : contrats et tables, sans émission, vérification
-  ni CLI de bootstrap. Aucun compte n'est créé au démarrage.
-- Pas de CRUD complet : création/liste des habitudes, ajout/lecture/liste des
-  entrées seulement. Correction/annulation, fréquence N/semaine et administration
-  des exceptions restent à faire ; périodes quotidiennes uniquement.
-- Pas de calcul streak/records, taux/heatmap, XP/niveaux, agrégats ou projections.
-  Le test repos prouve le refus d'un check-in ce jour-là ; il ne prouve pas encore
-  le critère final sur les taux et séries, dont les moteurs restent à écrire.
-- Pas de connecteur Strava/HA, OAuth, validation webhook, worker de jobs,
-  synchronisation/retries ou chiffrement effectif de refresh tokens. Aucun secret
-  de fournisseur n'est reçu ni persisté. Les tables futures sont explicitement
-  inactives. Pas de test fictif de correction/suppression Strava ou de webhook.
-- Les pannes provider n'ont aucun effet sur ce socle sans dépendance provider ;
-  cela ne prouve pas la résilience des futurs connecteurs. Ajouter leurs tests
-  de panne, quotas, révocation/suppression et conservation avant le MVP complet.
-- CI GitHub configurée mais non exécutée à distance ; pas de publication/CD ni
-  déploiement public. Linux arm64 et macOS arm64 vérifiés, amd64 non exécuté ici.
-- Pas de benchmark de charge, métriques, scan CVE complet de l'image ou test
-  d'un reverse proxy NPMplus réel. Le quota global n'est pas un quota par tenant.
-- Rétention définie (7 quotidiennes + 4 hebdomadaires) et procédure documentée ;
-  ordonnancement, copies chiffrées hors hôte et rotation opérateur non déployés.
+- Aucun remote GitHub : pas de push d'image ni de run distant vérifié. Build local
+  Linux arm64 et release macOS arm64 prouvés ; publication amd64/arm64 configurée
+  dans la CI, construction amd64 non exécutée ici.
+- Pocket ID réel non configuré. L'adaptateur exige RFC 9068 at+jwt et les paramètres
+  explicites de [auth.md](auth.md) ; vérifier leur disponibilité avant activation.
+- OAuth/webhooks/sync Strava et HA testés contre des serveurs hors ligne. Aucun
+  compte, secret ou URL de déploiement inventé. L'opérateur doit configurer les
+  services, l'abonnement webhook, HTTPS et l'autorisation multi-athlète si nécessaire.
+- La révocation Strava livrée est locale avec purge ; déautorisation distante,
+  conditions/autorisation et rétention des données à valider avant exposition.
+  Pas de TTL automatique des imports ni de nettoyage général des jobs échoués/HA.
+- Rotation/ré-encryption des clés AEAD, quotas HTTP par principal, export API audit,
+  métriques/alertes et ordonnanceur des sauvegardes restent à réaliser/déployer.
+- Fenêtres horaires dans une journée, plages de vacances à ajouter ; changement de
+  type/unité/fuseau/période via nouvelle habitude. Statistiques recalculées depuis
+  les événements avec historique borné à cent ans ; benchmarks homelab non exécutés.
+- Notifications HA persistantes livrées ; push mobile/actionnables et custom card
+  constituent une extension distincte. Aucun frontend/PWA.
 
-Le backlog détaillé, aligné avec les 22 tâches Notion sans modification externe,
-est dans `TODO-MVP.md`. Cette validation couvre la première itération demandée,
-pas la totalité des critères d'acceptation ADR-001 du MVP final.
+La liste ordonnée des tâches restantes figure dans [TODO-MVP](../TODO-MVP.md).

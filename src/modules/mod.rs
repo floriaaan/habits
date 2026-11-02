@@ -10,6 +10,8 @@ pub mod users;
 
 #[derive(Debug, thiserror::Error)]
 pub enum DomainError {
+    #[error("Authentication required")]
+    Unauthenticated,
     #[error("{0}")]
     Validation(&'static str),
     #[error("Resource not found")]

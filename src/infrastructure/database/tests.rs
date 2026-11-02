@@ -215,7 +215,7 @@ async fn entry_replay_conflict_and_tenant_scoping() {
     );
     assert_eq!(fixture.count("entries").await, 2);
     assert_eq!(fixture.count("entry_events").await, 2);
-    assert_eq!(fixture.count("xp_ledger").await, 0);
+    assert_eq!(fixture.count("xp_ledger").await, 2);
 }
 
 #[tokio::test]
