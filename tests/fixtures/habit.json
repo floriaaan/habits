@@ -1,0 +1,7 @@
+{
+  "name": "Running",
+  "kind": "quantity",
+  "unit": "meters",
+  "target": 5000,
+  "timezone": "Europe/Paris"
+}

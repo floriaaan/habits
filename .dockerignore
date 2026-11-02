@@ -1,0 +1,7 @@
+.git
+target
+.env
+data
+backups
+*.sqlite*
+.DS_Store

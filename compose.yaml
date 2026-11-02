@@ -1,0 +1,34 @@
+services:
+  api:
+    build: .
+    image: habit-tracker:0.1.0
+    user: "10001:10001"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    init: true
+    environment:
+      LISTEN_ADDR: 0.0.0.0:8080
+      DATABASE_PATH: /data/habits.sqlite
+      AUTH_MODE: disabled
+      RUST_LOG: habit_tracker=info,tower_http=info
+    ports:
+      - "127.0.0.1:${HOST_PORT:-8080}:8080"
+    volumes:
+      - habit_data:/data
+    healthcheck:
+      test: [CMD, /usr/local/bin/habit-tracker, healthcheck]
+      interval: 15s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    restart: unless-stopped
+    stop_grace_period: 15s
+    mem_limit: 256m
+    cpus: 1.0
+    pids_limit: 128
+
+volumes:
+  habit_data:
+    driver: local
