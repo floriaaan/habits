@@ -10,6 +10,16 @@ statistiques 7/30/90 jours, heatmap, streaks et XP compensables.
 Pocket ID/OIDC, Strava et Home Assistant sont facultatifs. Leurs adaptateurs sont
 testés hors ligne ; leur validation avec des comptes réels reste à effectuer.
 
+Le [prototype Lovelace Home Assistant](docs/home-assistant-ui.md) est conservé
+dans `integrations/home-assistant/` : custom card, dashboard et helpers du
+laboratoire. Il utilise encore des helpers et des statistiques fictives ; son
+raccordement à l'API reste à réaliser. Il n'est pas compilé avec Rust.
+Pour répercuter les changements de carte dans HA, utiliser
+`task --watch ha:sync HA_WWW_DIR="/chemin/vers/config/www/habit-tracker"`
+avec le dossier HA monté sur le poste de développement, puis recharger la page HA.
+Avec un accès SSH, utiliser plutôt
+`task --watch ha:sync:ssh HA_SSH_HOST="alias-ssh"` : aucun partage monté nécessaire.
+
 ## Démarrage local
 
 Prérequis : rustup, compilateur C et CMake. Rust 1.99.1 et dépendances fixées
@@ -41,6 +51,42 @@ facultatifs. `LISTEN_ADDR` vaut `127.0.0.1:8080`, `DATABASE_PATH` vaut
 rester sur disque local. [Authentification](docs/auth.md),
 [connecteurs et exemples HA](docs/integrations.md).
 
+## Développement dans Docker avec Task
+
+Prérequis hôte : Docker avec Compose et [Task](https://taskfile.dev/docs/installation).
+Rust, CMake et Cargo ne sont pas nécessaires sur l'hôte pour ce parcours.
+
+Le développement utilise directement l'image Rust officielle, sans Dockerfile
+de développement ni build d'image applicative. Le dépôt est monté dans le
+conteneur, qui compile et exécute `cargo run --locked` en mode debug. Le processus
+utilise l'UID/GID de l'utilisateur hôte. Les caches Cargo/Rust et les artefacts
+Linux restent dans `target/docker/`, distincts du build natif ; la base se trouve
+dans `data/dev/habits.sqlite`, distincte du volume de production.
+
+```sh
+task dev:bootstrap                    # une seule fois : affiche le PAT initial
+AUTH_MODE=local task dev              # API sur http://127.0.0.1:8080
+```
+
+Le mode par défaut reste fermé ; renseigner `AUTH_MODE=local` dans `.env` pour
+conserver ce choix. Les connecteurs restent optionnels. Le premier lancement
+télécharge la toolchain du dépôt et les dépendances dans le cache monté.
+Après modification du code, arrêter avec Ctrl+C puis relancer `task dev` : Cargo
+recompile uniquement ce qui a changé. Aucun rechargement automatique n'est ajouté.
+
+```sh
+task dev:test                        # tests dans Linux
+task dev:cargo -- check --locked
+task dev:cargo -- fmt --all -- --check
+task dev:cargo -- clippy --locked --all-targets -- -D warnings
+task dev:shell                       # shell dans le même environnement
+```
+
+`task dev:bootstrap TIMEZONE=UTC` permet de choisir un autre fuseau. Les commandes
+partagent les caches et la base de développement ; les tests créent leurs bases
+temporaires. Ctrl+C arrête le serveur et le conteneur éphémère est supprimé sans
+effacer les caches ni les données. `HOST_PORT` permet de changer le port hôte.
+
 ## Arborescence
 
 ```text
@@ -56,7 +102,8 @@ src/
 │   ├── security/{mod,cipher,oidc}.rs
 │   └── integrations.rs
 └── http/{routes,middleware,auth,tracking,integrations}.rs
-migrations/000{1_initial,2_auth,3_events_projections,4_integrations_jobs}.sql
+migrations/000{1_initial,2_auth,3_events_projections,4_integrations_jobs,5_habit_categories}.sql
+integrations/home-assistant/{cards/,lovelace/,docs/}
 tests/fixtures/    scripts/    docs/    .github/workflows/ci.yml
 ```
 
@@ -107,9 +154,17 @@ quantity=meters/milliliters/count. Les repos ne comptent ni comme réussites ni
 comme échecs et ne cassent pas les séries. Une période atteinte rapporte 10 XP ;
 les changements de résultat produisent des compensations dans le ledger.
 
+Chaque habitude porte une `category` : `nutrition` (Alimentation), `sport`,
+`mind` (Esprit) ou `daily` (Quotidien). Exemple : ajouter `"category": "sport"`
+au corps de création. Le champ est retourné en création, lecture, liste et
+historique ; son omission signifie `daily`, y compris dans une définition
+complète envoyée par PUT. Une modification prend effet à la date future de la
+version, sans effet sur les XP. Les anciennes habitudes reçoivent `daily`.
+Voir les [décisions et précautions de migration](docs/decisions-habit-categories.md).
+
 ## Migrations et stockage
 
-SQLx applique automatiquement les quatre migrations et vérifie leurs checksums :
+SQLx applique automatiquement les cinq migrations et vérifie leurs checksums :
 
 1. `0001_initial.sql` : tables tenant-scoped, identités, habitudes, schedules,
    exceptions, entrées/événements, sources, intégrations, jobs, tokens et ledger.
@@ -118,6 +173,8 @@ SQLx applique automatiquement les quatre migrations et vérifie leurs checksums 
    projections et ledger compensable ; reprise des événements/XP existants testée.
 4. `0004_integrations_jobs.sql` : bail des jobs, hash de payload, révision des
    credentials, states OAuth hashés, mappings et compteurs de quotas.
+5. `0005_habit_categories.sql` : catégorie `daily` pour les définitions et versions
+   existantes sans catégorie ; événements, entrées et ledger conservés.
 
 WAL, FK activées, synchronous=FULL, busy_timeout 5 s ; FK composites et index
 uniques assurent isolation et idempotence. Réalisation/événements/projections/XP

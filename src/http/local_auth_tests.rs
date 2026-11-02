@@ -64,6 +64,77 @@ async fn call(
 }
 
 #[tokio::test]
+async fn habit_categories_round_trip_with_local_auth_and_legacy_default() {
+    let fixture = Fixture::new().await;
+    let foreign = fixture.habit().await;
+    let admin = fixture.store.bootstrap_local("UTC").await.unwrap();
+    let app = router_with_auth(fixture.store.clone(), AuthMode::Tokens);
+    for category in [
+        Some("nutrition"),
+        Some("sport"),
+        Some("mind"),
+        Some("daily"),
+        None,
+    ] {
+        let mut input = serde_json::to_value(habit_input()).unwrap();
+        if let Some(category) = category {
+            input["category"] = json!(category);
+        } else {
+            input.as_object_mut().unwrap().remove("category");
+        }
+        let (status, habit) = call(
+            &app,
+            "POST",
+            "/api/v1/habits",
+            Some(&admin.token),
+            Some(input),
+            None,
+        )
+        .await;
+        assert_eq!(status, StatusCode::CREATED);
+        assert_eq!(habit["category"], category.unwrap_or("daily"));
+        let path = format!("/api/v1/habits/{}", habit["id"].as_str().unwrap());
+        assert_eq!(
+            call(&app, "GET", &path, Some(&admin.token), None, None).await,
+            (StatusCode::OK, habit)
+        );
+    }
+    let (status, list) = call(
+        &app,
+        "GET",
+        "/api/v1/habits",
+        Some(&admin.token),
+        None,
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let items = list["items"].as_array().unwrap();
+    assert_eq!(items.len(), 5);
+    for category in ["nutrition", "sport", "mind", "daily"] {
+        assert!(items.iter().any(|habit| habit["category"] == category));
+    }
+    assert!(
+        items
+            .iter()
+            .all(|habit| habit["user_id"] == admin.metadata.user_id.0.to_string())
+    );
+    assert_eq!(
+        call(
+            &app,
+            "GET",
+            &format!("/api/v1/habits/{}", foreign.id),
+            Some(&admin.token),
+            None,
+            None
+        )
+        .await
+        .0,
+        StatusCode::NOT_FOUND
+    );
+}
+
+#[tokio::test]
 async fn real_local_bearer_supports_tracking_and_idempotent_cancellation() {
     let fixture = Fixture::new().await;
     let provisioned = fixture.store.local_user("UTC").await.unwrap();

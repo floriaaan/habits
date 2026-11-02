@@ -1,0 +1,20 @@
+# Composants custom autonomes de l'actuel labo Habit Tracker.
+# Ce fragment ne contient pas toute la vue : pour l'export intégral,
+# télécharger habit-lab-dashboard.json depuis la page Notion indiquée dans README.md.
+- type: custom:habit-lab-visual-card
+  mode: rings
+  grid_options:
+    columns: full
+    rows: auto
+
+- type: custom:habit-lab-visual-card
+  mode: weekly
+  grid_options:
+    columns: 12
+    rows: auto
+
+- type: custom:habit-lab-visual-card
+  mode: heatmap
+  grid_options:
+    columns: 12
+    rows: auto

@@ -2669,6 +2669,15 @@
           }
         ]
       },
+      "HabitCategory": {
+        "type": "string",
+        "enum": [
+          "nutrition",
+          "sport",
+          "mind",
+          "daily"
+        ]
+      },
       "HabitKind": {
         "type": "string",
         "enum": [
@@ -2910,6 +2919,11 @@
           "timezone"
         ],
         "properties": {
+          "category": {
+            "$ref": "#/components/schemas/HabitCategory",
+            "description": "Card category. Omission defaults to daily for backwards compatibility.",
+            "default": "daily"
+          },
           "kind": {
             "$ref": "#/components/schemas/HabitKind"
           },

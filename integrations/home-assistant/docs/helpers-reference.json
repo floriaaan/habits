@@ -1,0 +1,71 @@
+[
+  {
+    "id": "labo_habits_lecture",
+    "name": "Labo Habits - Lecture",
+    "icon": "mdi:book-open",
+    "entity_id": "input_boolean.labo_habits_lecture",
+    "original_name": "Labo Habits - Lecture"
+  },
+  {
+    "id": "labo_habits_meditation",
+    "name": "Labo Habits - Méditation",
+    "icon": "mdi:meditation",
+    "entity_id": "input_boolean.labo_habits_meditation",
+    "original_name": "Labo Habits - Méditation"
+  },
+  {
+    "id": "labo_habits_rangement",
+    "name": "Labo Habits - Rangement",
+    "icon": "mdi:broom",
+    "entity_id": "input_boolean.labo_habits_rangement",
+    "original_name": "Labo Habits - Rangement"
+  },
+  {
+    "id": "labo_habits_running_km",
+    "name": "Labo Habits - Running km",
+    "icon": "mdi:run",
+    "min": 0,
+    "max": 10000,
+    "step": 0.1,
+    "unit_of_measurement": "km",
+    "mode": "box",
+    "entity_id": "input_number.labo_habits_running_km",
+    "original_name": "Labo Habits - Running km"
+  },
+  {
+    "id": "labo_habits_natation_m",
+    "name": "Labo Habits - Natation m",
+    "icon": "mdi:swim",
+    "min": 0,
+    "max": 10000,
+    "step": 100,
+    "unit_of_measurement": "m",
+    "mode": "box",
+    "entity_id": "input_number.labo_habits_natation_m",
+    "original_name": "Labo Habits - Natation m"
+  },
+  {
+    "id": "labo_habits_eau_consommee",
+    "name": "Labo Habits - Eau consommée",
+    "icon": "mdi:water",
+    "min": 0,
+    "max": 5000,
+    "step": 250,
+    "unit_of_measurement": "mL",
+    "mode": "box",
+    "entity_id": "input_number.labo_habits_eau_consommee",
+    "original_name": "Labo Habits - Eau consommée"
+  },
+  {
+    "id": "labo_habits_fruits_et_legumes",
+    "name": "Labo Habits - Fruits et légumes",
+    "icon": "mdi:food-apple",
+    "min": 0,
+    "max": 15,
+    "step": 1,
+    "unit_of_measurement": "portions",
+    "mode": "box",
+    "entity_id": "input_number.labo_habits_fruits_et_legumes",
+    "original_name": "Labo Habits - Fruits et légumes"
+  }
+]

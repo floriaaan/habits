@@ -1,0 +1,232 @@
+{
+  "views": [
+    {
+      "title": "Mes habitudes",
+      "path": "habit-tracker",
+      "icon": "mdi:check-circle-outline",
+      "type": "sections",
+      "max_columns": 2,
+      "sections": [
+        {
+          "type": "grid",
+          "column_span": 2,
+          "cards": [
+            {
+              "type": "heading",
+              "heading": "Vue d’ensemble",
+              "icon": "mdi:chart-donut-variant",
+              "heading_style": "title",
+              "grid_options": {
+                "columns": "full",
+                "rows": "auto"
+              }
+            },
+            {
+              "type": "custom:habit-lab-visual-card",
+              "mode": "rings",
+              "grid_options": {
+                "columns": "full",
+                "rows": "auto"
+              }
+            }
+          ]
+        },
+        {
+          "type": "grid",
+          "cards": [
+            {
+              "type": "heading",
+              "heading": "Habitudes du jour",
+              "icon": "mdi:check-circle-outline",
+              "heading_style": "title",
+              "grid_options": {
+                "columns": "full",
+                "rows": "auto"
+              }
+            },
+            {
+              "type": "custom:mushroom-template-card",
+              "primary": "Lecture",
+              "secondary": "{{ 'Terminée aujourd’hui' if is_state('input_boolean.labo_habits_lecture','on') else 'À faire · 20 minutes' }}",
+              "icon": "mdi:book-open-variant",
+              "icon_color": "{{ 'green' if is_state('input_boolean.labo_habits_lecture','on') else 'disabled' }}",
+              "entity": "input_boolean.labo_habits_lecture",
+              "tap_action": {
+                "action": "toggle"
+              },
+              "grid_options": {
+                "columns": 12,
+                "rows": 1
+              },
+              "card_mod": {
+                "style": "ha-card {border-radius:20px !important;box-shadow:none !important;}"
+              }
+            },
+            {
+              "type": "custom:mushroom-template-card",
+              "primary": "Méditation",
+              "secondary": "{{ 'Terminée aujourd’hui' if is_state('input_boolean.labo_habits_meditation','on') else 'À faire · 10 minutes' }}",
+              "icon": "mdi:meditation",
+              "icon_color": "{{ 'green' if is_state('input_boolean.labo_habits_meditation','on') else 'disabled' }}",
+              "entity": "input_boolean.labo_habits_meditation",
+              "tap_action": {
+                "action": "toggle"
+              },
+              "grid_options": {
+                "columns": 12,
+                "rows": 1
+              },
+              "card_mod": {
+                "style": "ha-card {border-radius:20px !important;box-shadow:none !important;}"
+              }
+            },
+            {
+              "type": "custom:mushroom-template-card",
+              "primary": "Rangement",
+              "secondary": "{{ 'Terminée aujourd’hui' if is_state('input_boolean.labo_habits_rangement','on') else 'À faire · Quotidien' }}",
+              "icon": "mdi:broom",
+              "icon_color": "{{ 'green' if is_state('input_boolean.labo_habits_rangement','on') else 'disabled' }}",
+              "entity": "input_boolean.labo_habits_rangement",
+              "tap_action": {
+                "action": "toggle"
+              },
+              "grid_options": {
+                "columns": 12,
+                "rows": 1
+              },
+              "card_mod": {
+                "style": "ha-card {border-radius:20px !important;box-shadow:none !important;}"
+              }
+            }
+          ]
+        },
+        {
+          "type": "grid",
+          "cards": [
+            {
+              "type": "heading",
+              "heading": "Sport · Saisie rapide",
+              "icon": "mdi:run-fast",
+              "heading_style": "title",
+              "grid_options": {
+                "columns": "full",
+                "rows": "auto"
+              }
+            },
+            {
+              "type": "entities",
+              "title": "Saisie rapide",
+              "show_header_toggle": false,
+              "entities": [
+                {
+                  "entity": "input_number.labo_habits_running_km",
+                  "name": "Running · kilomètres"
+                },
+                {
+                  "entity": "input_number.labo_habits_natation_m",
+                  "name": "Natation · mètres"
+                }
+              ],
+              "grid_options": {
+                "columns": 12,
+                "rows": "auto"
+              },
+              "card_mod": {
+                "style": "ha-card {border-radius:24px !important;box-shadow:none !important;}"
+              }
+            },
+            {
+              "type": "custom:mushroom-template-card",
+              "primary": "Connexion Strava",
+              "secondary": "Running et natation · synchronisation future",
+              "icon": "mdi:sync",
+              "icon_color": "disabled",
+              "tap_action": {
+                "action": "none"
+              },
+              "grid_options": {
+                "columns": 12,
+                "rows": 1
+              }
+            }
+          ]
+        },
+        {
+          "type": "grid",
+          "cards": [
+            {
+              "type": "heading",
+              "heading": "Alimentation · Saisie rapide",
+              "icon": "mdi:food-apple-outline",
+              "heading_style": "title",
+              "grid_options": {
+                "columns": "full",
+                "rows": "auto"
+              }
+            },
+            {
+              "type": "entities",
+              "title": "Aujourd'hui",
+              "show_header_toggle": false,
+              "entities": [
+                {
+                  "entity": "input_number.labo_habits_eau_consommee",
+                  "name": "Eau consommée · objectif 2 L"
+                },
+                {
+                  "entity": "input_number.labo_habits_fruits_et_legumes",
+                  "name": "Fruits et légumes · objectif 5 portions"
+                }
+              ],
+              "grid_options": {
+                "columns": 12,
+                "rows": "auto"
+              },
+              "card_mod": {
+                "style": "ha-card {border-radius:24px !important;box-shadow:none !important;}"
+              }
+            }
+          ]
+        },
+        {
+          "type": "grid",
+          "cards": [
+            {
+              "type": "heading",
+              "heading": "Statistiques hebdomadaires",
+              "icon": "mdi:chart-bar",
+              "heading_style": "title"
+            },
+            {
+              "type": "custom:habit-lab-visual-card",
+              "mode": "weekly",
+              "grid_options": {
+                "columns": "full",
+                "rows": "auto"
+              }
+            }
+          ]
+        },
+        {
+          "type": "grid",
+          "cards": [
+            {
+              "type": "heading",
+              "heading": "Historique",
+              "icon": "mdi:calendar-month-outline",
+              "heading_style": "title"
+            },
+            {
+              "type": "custom:habit-lab-visual-card",
+              "mode": "heatmap",
+              "grid_options": {
+                "columns": "full",
+                "rows": "auto"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

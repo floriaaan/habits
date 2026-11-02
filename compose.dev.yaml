@@ -1,0 +1,29 @@
+services:
+  dev:
+    image: rust:1.99.1-bookworm@sha256:9181b56c2a21ab1d5e73cffe04fc762426d30aa7fac3c91141dd033f49a7fc8b
+    user: "${DEV_UID:?Run this service through Task}:${DEV_GID:?Run this service through Task}"
+    working_dir: /workspace
+    init: true
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    command: [cargo, run, --locked]
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      CARGO_HOME: /cache/cargo
+      RUSTUP_HOME: /cache/rustup
+      CARGO_TARGET_DIR: /cache/target
+      LISTEN_ADDR: 0.0.0.0:8080
+      DATABASE_PATH: /data/habits.sqlite
+      AUTH_MODE: ${AUTH_MODE:-disabled}
+    ports:
+      - "127.0.0.1:${HOST_PORT:-8080}:8080"
+    volumes:
+      - .:/workspace
+      - ./target/docker:/cache
+      - ./data/dev:/data
+    tmpfs:
+      - /tmp:mode=1777

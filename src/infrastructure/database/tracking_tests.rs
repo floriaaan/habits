@@ -8,7 +8,7 @@ use crate::modules::{
     DomainError,
     auth::{Principal, Scope},
     entries::{self, CheckInPayload, NewEntry},
-    habits::{self, HabitKind, Pagination, Period, Unit, UpdateHabit},
+    habits::{self, HabitCategory, HabitKind, Pagination, Period, Unit, UpdateHabit},
 };
 use chrono::{Duration, NaiveDate, Utc};
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
@@ -310,6 +310,7 @@ async fn future_definition_preserves_historical_target_completion_and_xp() {
         + Duration::days(1);
     let mut future = habit.definition.clone();
     future.target = 10000.0;
+    future.category = HabitCategory::Mind;
     let version = fixture
         .store
         .update_habit(
@@ -324,6 +325,15 @@ async fn future_definition_preserves_historical_target_completion_and_xp() {
         .unwrap();
     assert_eq!(version.effective_from, tomorrow);
     assert_eq!(version.definition.target, 10000.0);
+    assert_eq!(version.definition.category, HabitCategory::Mind);
+    let mut current = fixture.store.get_habit(&alice, habit.id).await.unwrap();
+    assert_eq!(current.definition.category, HabitCategory::Sport);
+    let mut connection = fixture.store.pool.acquire().await.unwrap();
+    super::tracking::apply_version(&mut connection, &mut current, tomorrow)
+        .await
+        .unwrap();
+    assert_eq!(current.definition.category, HabitCategory::Mind);
+    drop(connection);
     assert_eq!(
         fixture
             .store
@@ -433,6 +443,61 @@ async fn weekly_frequency_rewards_one_period_after_three_distinct_checkins() {
 }
 
 #[tokio::test]
+async fn category_migration_fills_missing_fields_and_preserves_explicit_versions() {
+    let fixture = Fixture::new().await;
+    let habit = fixture.habit().await;
+    let alice = actor(1);
+    let mut future = habit.definition.clone();
+    future.category = HabitCategory::Nutrition;
+    fixture
+        .store
+        .update_habit(
+            &alice,
+            habit.id,
+            UpdateHabit {
+                effective_from: Utc::now()
+                    .with_timezone(&chrono_tz::Europe::Paris)
+                    .date_naive()
+                    + Duration::days(1),
+                definition: future,
+            },
+        )
+        .await
+        .unwrap();
+    sqlx::query("UPDATE habits SET definition = json_remove(definition, '$.category')")
+        .execute(&fixture.store.pool)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE habit_versions SET definition = json_remove(definition, '$.category') WHERE effective_from = '1970-01-01'")
+        .execute(&fixture.store.pool).await.unwrap();
+    for _ in 0..2 {
+        sqlx::raw_sql(include_str!(
+            "../../../migrations/0005_habit_categories.sql"
+        ))
+        .execute(&fixture.store.pool)
+        .await
+        .unwrap();
+    }
+    let categories: Vec<String> = sqlx::query_scalar(
+        "SELECT json_extract(definition, '$.category') FROM habit_versions ORDER BY effective_from",
+    )
+    .fetch_all(&fixture.store.pool)
+    .await
+    .unwrap();
+    assert_eq!(categories, vec!["daily", "nutrition"]);
+    assert_eq!(
+        fixture
+            .store
+            .get_habit(&alice, habit.id)
+            .await
+            .unwrap()
+            .definition
+            .category,
+        HabitCategory::Daily
+    );
+}
+
+#[tokio::test]
 async fn upgrading_initial_database_preserves_legacy_events_and_xp_then_allows_compensation() {
     let directory = tempfile::tempdir().unwrap();
     let migrations = directory.path().join("initial-migrations");
@@ -470,6 +535,11 @@ async fn upgrading_initial_database_preserves_legacy_events_and_xp_then_allows_c
     let ledger = Uuid::new_v4();
     let input = entry_input();
     let definition = habit_input();
+    let mut legacy_definition = serde_json::to_value(&definition).unwrap();
+    legacy_definition
+        .as_object_mut()
+        .unwrap()
+        .remove("category");
     let local_date = input
         .occurred_at
         .with_timezone(&chrono_tz::Europe::Paris)
@@ -477,7 +547,7 @@ async fn upgrading_initial_database_preserves_legacy_events_and_xp_then_allows_c
     sqlx::query("INSERT INTO habits (id, user_id, definition, created_at) VALUES (?, ?, ?, ?)")
         .bind(habit.to_string())
         .bind(alice.user_id.0.to_string())
-        .bind(serde_json::to_string(&definition).unwrap())
+        .bind(legacy_definition.to_string())
         .bind(input.occurred_at)
         .execute(&pool)
         .await
@@ -512,6 +582,25 @@ async fn upgrading_initial_database_preserves_legacy_events_and_xp_then_allows_c
         .await
         .unwrap();
     MIGRATOR.run(&store.pool).await.unwrap();
+    assert_eq!(
+        store
+            .get_habit(&alice, habit)
+            .await
+            .unwrap()
+            .definition
+            .category,
+        HabitCategory::Daily
+    );
+    for query in [
+        "SELECT json_extract(definition, '$.category') FROM habits",
+        "SELECT json_extract(definition, '$.category') FROM habit_versions",
+    ] {
+        let categories: Vec<String> = sqlx::query_scalar(query)
+            .fetch_all(&store.pool)
+            .await
+            .unwrap();
+        assert_eq!(categories, vec!["daily"]);
+    }
     assert_eq!(
         entries::get(&store, &alice, entry).await.unwrap().value,
         5000.0

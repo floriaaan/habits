@@ -1,0 +1,102 @@
+version: '3'
+
+vars:
+  DEV_UID:
+    sh: id -u
+  DEV_GID:
+    sh: id -g
+  COMPOSE: docker compose --project-name habits-dev --file compose.dev.yaml
+  TIMEZONE: Europe/Paris
+
+env:
+  DEV_UID: '{{.DEV_UID}}'
+  DEV_GID: '{{.DEV_GID}}'
+
+tasks:
+  default:
+    cmds:
+      - task --list
+
+  dev:
+    desc: Compile et lance l'API depuis les sources dans Docker (Ctrl+C pour arrêter)
+    deps: [dev:prepare]
+    cmds:
+      - defer: '{{.COMPOSE}} down'
+      - '{{.COMPOSE}} up --no-build --abort-on-container-exit --exit-code-from dev'
+
+  dev:bootstrap:
+    desc: Crée le premier PAT local sur la base de développement (une seule fois)
+    deps: [dev:prepare]
+    cmds:
+      - '{{.COMPOSE}} run --rm --no-deps dev cargo run --locked -- bootstrap-local {{.TIMEZONE | shellQuote}}'
+
+  dev:test:
+    desc: Exécute les tests dans le conteneur Rust
+    deps: [dev:prepare]
+    cmds:
+      - '{{.COMPOSE}} run --rm --no-deps dev cargo test --locked --all-targets'
+
+  dev:cargo:
+    desc: Lance Cargo dans Docker (task dev:cargo -- check --locked)
+    deps: [dev:prepare]
+    cmds:
+      - '{{.COMPOSE}} run --rm --no-deps dev cargo {{.CLI_ARGS}}'
+
+  dev:shell:
+    desc: Ouvre un shell dans le conteneur de développement
+    interactive: true
+    deps: [dev:prepare]
+    cmds:
+      - '{{.COMPOSE}} run --rm --no-deps dev bash --noprofile --norc'
+
+  ha:sync:
+    desc: Synchronise la carte vers config/www (task --watch ha:sync HA_WWW_DIR=/chemin/habit-tracker)
+    requires:
+      vars: [HA_WWW_DIR]
+    env:
+      HA_SYNC_DEST: '{{.HA_WWW_DIR}}'
+    sources:
+      - integrations/home-assistant/cards/habit-lab-visual-card.js
+    # Copier aussi au premier lancement ou si la destination change.
+    status: ['false']
+    preconditions:
+      - sh: test -d "$HA_SYNC_DEST"
+        msg: HA_WWW_DIR doit être un dossier existant correspondant à config/www/habit-tracker.
+    cmds:
+      - cp integrations/home-assistant/cards/habit-lab-visual-card.js "$HA_SYNC_DEST/habit-lab-visual-card.js"
+
+  ha:sync:ssh:
+    desc: Synchronise la carte par SSH (task --watch ha:sync:ssh HA_SSH_HOST=alias-ssh)
+    requires:
+      vars: [HA_SSH_HOST]
+    env:
+      HA_SSH_TARGET: '{{.HA_SSH_HOST}}'
+    sources:
+      - integrations/home-assistant/cards/habit-lab-visual-card.js
+    status: ['false']
+    cmds:
+      - |
+        ssh -- "$HA_SSH_TARGET" '
+          set -eu
+          if test -f /homeassistant/configuration.yaml; then
+            ha_config_dir=/homeassistant
+          elif test -f /config/configuration.yaml; then
+            ha_config_dir=/config
+          else
+            echo "HA configuration directory not found" >&2
+            exit 1
+          fi
+          ha_card_dir="$ha_config_dir/www/habit-tracker"
+          mkdir -p "$ha_card_dir"
+          ha_card_tmp=$(mktemp "$ha_card_dir/.habit-lab-visual-card.XXXXXX")
+          trap '\''rm -f "$ha_card_tmp"'\'' EXIT
+          cat > "$ha_card_tmp"
+          chmod 644 "$ha_card_tmp"
+          mv -f "$ha_card_tmp" "$ha_card_dir/habit-lab-visual-card.js"
+        ' < integrations/home-assistant/cards/habit-lab-visual-card.js
+
+  dev:prepare:
+    internal: true
+    cmds:
+      - mkdir -p target/docker data/dev
+      - chmod 700 data/dev

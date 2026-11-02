@@ -99,3 +99,23 @@ retry. Des tests ciblés couvrent les quatre. Les compilations intermédiaires
   constituent une extension distincte. Aucun frontend/PWA.
 
 La liste ordonnée des tâches restantes figure dans [TODO-MVP](../TODO-MVP.md).
+
+## Ajout des catégories — 2026-11-02
+
+Vérifications relancées en Rust 1.99.1 sur macOS arm64 :
+
+- `cargo test --locked --all-targets` : **53 tests réussis**, aucun échec.
+- `cargo fmt --all -- --check`,
+  `cargo clippy --locked --all-targets --all-features -- -D warnings` et
+  `cargo build --locked --release` : succès.
+- `cargo run --locked -- openapi` : snapshot régénéré, diff identique ;
+  `python3 scripts/check_domain_boundaries.py` et `git diff --check` : succès.
+- Création/lecture/liste des quatre catégories avec PAT réel, défaut `daily`,
+  isolation et rejet des valeurs invalides ; catégorie future appliquée à sa
+  date d'effet, historique et XP conservés.
+- Migration 0005 rejouée sans écraser les catégories explicites ; upgrade depuis
+  0001 préservant entrées et ledger, puis compensation encore fonctionnelle.
+
+`task dev:cargo -- fmt --all` a échoué faute de socket Docker/OrbStack disponible.
+Les vérifications ci-dessus ont donc été exécutées avec la toolchain locale ;
+le build et le smoke Docker n'ont pas été relancés pour cet ajout.

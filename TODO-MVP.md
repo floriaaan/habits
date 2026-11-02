@@ -13,7 +13,7 @@ La recette des fournisseurs réels et le déploiement ne sont pas déclarés ter
    Config validée, clé env AES-256-GCM, AAD tenant/provider/version et tests de tampering. Ré-encryption/rotation des clés et procédure de récupération restent à automatiser. Dépendance : 1.
 
 3. [Créer schéma SQLite SQLx et migrations](https://app.notion.com/p/40c4a85853dd813a8678c62b7b6715a4) — **livré**.
-   Quatre migrations, FK composites/index tenant/idempotence, WAL ; upgrade depuis 0001 et reprise événements/XP testés. Dépendance : 1–2.
+   Cinq migrations, FK composites/index tenant/idempotence, WAL ; upgrade depuis 0001 et reprise événements/XP testés. Dépendance : 1–2.
 
 4. [Configurer Axum, Tokio, routing, errors et healthchecks](https://app.notion.com/p/40c4a85853dd81b5a3fbefcd2710c25c) — **livré**.
    Request IDs, erreurs uniformes, limites, healthchecks et routes fermées par défaut. Dépendance : 2–3.
@@ -28,7 +28,7 @@ La recette des fournisseurs réels et le déploiement ne sont pas déclarés ter
    Utilisateur local unique, bootstrap CLI, PAT/SA opaques hashés, scopes, expiration, rotation/révocation/audit transactionnel. Quota HTTP global présent ; quota par principal et lecture API audit/SA à ajouter. Dépendance : 3–5.
 
 8. [Créer CRUD des habitudes et objectifs quantifiables](https://app.notion.com/p/40c4a85853dd811c8a92e528940caa46) — **livré**.
-   Création/liste/lecture, définitions futures historisées, archivage préservant les données. Type/unité/fuseau/période immuables. Dépendance : 5, 7.
+   Création/liste/lecture, catégories nutrition/sport/mind/daily, définitions futures historisées, archivage préservant les données. Type/unité/fuseau/période immuables. Dépendance : 5, 7.
 
 9. [Créer schedules, repos, exceptions et timezone](https://app.notion.com/p/40c4a85853dd811eb49cced04a3be249) — **livré pour fenêtres dans une journée**.
    Schedules quotidiens/hebdomadaires, fréquence N/semaine, repos CRUD, IANA/DST et définitions versionnées. Vacances en plage et fenêtres traversant minuit restent des extensions explicites. Dépendance : 8.
@@ -57,8 +57,8 @@ La recette des fournisseurs réels et le déploiement ne sont pas déclarés ter
 17. [Implémenter endpoints et connecteur Home Assistant](https://app.notion.com/p/40c4a85853dd81cea90ac0a1dca46012) — **adaptateur livré ; instance réelle à valider**.
    Lecture des indicateurs/check-in par API avec PAT/SA, notifications HA persistantes en jobs, token chiffré, panne/retry testés hors ligne. Dépendance : 7, 10–13, 15.
 
-18. [Documenter intégration Lovelace et notifications actionnables](https://app.notion.com/p/40c4a85853dd8163b256f2c3bc15ccbb) — **exemples livrés ; extension distincte hors périmètre**.
-   Configuration HA et REST dans docs/integrations.md, pas de PWA. Les notifications actionnables natives et une custom card restent un livrable séparé. Dépendance : 17.
+18. [Documenter intégration Lovelace et notifications actionnables](https://app.notion.com/p/40c4a85853dd8163b256f2c3bc15ccbb) — **prototype Lovelace importé ; raccordement API restant**.
+   Exports exacts du laboratoire dans integrations/home-assistant/ ; installation, provenance et limites dans docs/home-assistant-ui.md. Remplacer les identifiants/valeurs fictives, relier les actions et statistiques à l'API avec isolation des utilisateurs, puis valider mobile/thèmes dans HA. Notifications actionnables natives à compléter ; aucune PWA. Dépendance : 17.
 
 19. [Documenter API OpenAPI v1 et pagination](https://app.notion.com/p/40c4a85853dd814f8fd5c42c6657f2fc) — **livré pour les routes actuelles**.
    OpenAPI généré y compris OAuth/webhook, snapshot CI, pagination et scopes. Dépendance : 4, 8–10.

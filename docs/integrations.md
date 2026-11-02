@@ -56,8 +56,10 @@ des fichiers de configuration publiés.
 `notifications:write`, un `Idempotency-Key` de 1–128 caractères ASCII visibles et
 `{"title":"…","message":"…"}` (120/4096 octets maximum). La réponse 202 contient
 `job_id`. Le worker appelle `persistent_notification.create`, `notification_id`
-égal au job pour stabiliser les retries. Autres services/mobile push et custom
-card ne sont pas implémentés. Un token HA invalide fait échouer le job.
+égal au job pour stabiliser les retries. Autres services/mobile push et carte
+connectée à l'API restent à implémenter. Un token HA invalide fait échouer le job.
+Le [prototype Lovelace du laboratoire](home-assistant-ui.md) est importé séparément
+dans `integrations/home-assistant/`, avec ses helpers et statistiques fictives.
 
 ## Strava
 

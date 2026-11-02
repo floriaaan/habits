@@ -20,6 +20,16 @@ pub enum HabitKind {
     Frequency,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum HabitCategory {
+    Nutrition,
+    Sport,
+    Mind,
+    #[default]
+    Daily,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Unit {
@@ -53,6 +63,10 @@ pub struct UpdateHabit {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct NewHabit {
+    /// Card category. Omission defaults to daily for backwards compatibility.
+    #[serde(default)]
+    #[schema(default = "daily")]
+    pub category: HabitCategory,
     #[serde(default)]
     pub period: Period,
     pub name: String,

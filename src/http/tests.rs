@@ -231,6 +231,9 @@ async fn http_validation_scopes_body_limit_and_uniform_errors() {
         json!({"timezone":"invalid"}),
         json!({"name":""}),
         json!({"target":-1}),
+        json!({"category":"alimentation"}),
+        json!({"category":null}),
+        json!({"category":42}),
         json!({"user_id":"spoof"}),
         json!({"kind":"duration","unit":"meters"}),
         json!({"schedule":{"weekdays":[1,1],"start":null,"end":null}}),
@@ -373,6 +376,21 @@ async fn rate_budget_is_bounded_and_returns_retry_after() {
 #[test]
 fn openapi_documents_routes_security_and_request_schemas() {
     let document = serde_json::to_value(ApiDoc::openapi()).unwrap();
+    let schemas = &document["components"]["schemas"];
+    assert_eq!(
+        schemas["HabitCategory"]["enum"],
+        json!(["nutrition", "sport", "mind", "daily"])
+    );
+    assert_eq!(
+        schemas["NewHabit"]["properties"]["category"]["default"],
+        "daily"
+    );
+    assert!(
+        !schemas["NewHabit"]["required"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("category"))
+    );
     for (path, item) in document["paths"].as_object().unwrap() {
         for operation in item
             .as_object()
