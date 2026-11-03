@@ -322,6 +322,9 @@ Voir [décision et exception de journalisation](decisions-auto-bootstrap.md).
   expiration/révocation. Les modes disabled et OIDC n'émettent aucun PAT initial.
 - `cargo clippy --locked --all-targets --all-features -- -D warnings` et
   `cargo build --locked --release` : succès sur le poste de développement.
+  `cargo fmt --all -- --check`, OpenAPI généré comparé au contrat versionné,
+  `actionlint` et `git diff --check` : succès. Les tests du processus confirment
+  aussi qu'un healthcheck exécuté avec AUTH_MODE=local n'émet pas de token.
 - Les blocs Compose extraits des README sont identiques et validés seuls avec
   `docker compose --env-file /dev/null -f … config --format json` : image GHCR,
   aucun build, mode local, toutes les variables runtime présentes, non-root,
@@ -334,3 +337,10 @@ Voir [décision et exception de journalisation](decisions-auto-bootstrap.md).
 
 Les tests de démarrage utilisent des bases et ports loopback temporaires, sans
 fournisseur externe. Aucun secret réel ni Home Assistant personnel n'est utilisé.
+
+- [CI complète réussie](https://github.com/floriaaan/habits/actions/runs/41685228623) :
+  64 tests Rust, tests HA réels, audit/deny, smoke Docker AMD64/ARM64 incluant le
+  bootstrap automatique et l'absence de réémission après restauration/redémarrage.
+  Les images testées sont publiées dans le manifeste GHCR multi-architecture
+  (`latest` et `sha-e5af031b42f4b04316ad7adf6899b99d305dc8e2`). Aucun conteneur
+  de production de l'opérateur n'a été modifié.
