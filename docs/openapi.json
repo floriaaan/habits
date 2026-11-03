@@ -2859,6 +2859,13 @@
         "properties": {
           "action": {
             "$ref": "#/components/schemas/HabitAction"
+          },
+          "value": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
           }
         },
         "additionalProperties": false
@@ -3260,7 +3267,8 @@
           "complete",
           "uncomplete",
           "increment",
-          "decrement"
+          "decrement",
+          "set_value"
         ]
       },
       "HabitCategory": {

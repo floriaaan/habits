@@ -250,6 +250,12 @@ class HomeAssistantEndToEnd(unittest.IsolatedAsyncioTestCase):
         await self.hass.services.async_call("habit_tracker", "perform_action", {
             "entity_id": dashboard_id, "habit_id": water["id"], "action": "decrement"}, blocking=True)
         await self.wait_until(lambda: entry.runtime_data.habits()[water["id"]]["progress"] == 0)
+        for value in (750, 250):
+            await self.hass.services.async_call("habit_tracker", "perform_action", {
+                "entity_id": dashboard_id, "habit_id": water["id"], "action": "set_value", "value": value}, blocking=True)
+            await self.wait_until(lambda: entry.runtime_data.habits()[water["id"]]["progress"] == value)
+        await self.hass.services.async_call("habit_tracker", "perform_action", {
+            "entity_id": dashboard_id, "habit_id": water["id"], "action": "set_value", "value": 0}, blocking=True)
         # An external CLI action arrives through SSE, without a manual refresh.
         await self.request("POST", f"/api/v1/habits/{water['id']}/actions", {"action": "increment"}, "external-change")
         await self.wait_until(lambda: entry.runtime_data.habits()[water["id"]]["progress"] == 250)
@@ -305,7 +311,7 @@ class HomeAssistantEndToEnd(unittest.IsolatedAsyncioTestCase):
         items = [item for item in result["result"] if item["url"].startswith("/habit_tracker/frontend/")]
         self.assertEqual([item["type"] for item in items], ["module"])
         cards = [item["url"] for item in items]
-        self.assertEqual(cards, ["/habit_tracker/frontend/0.3.0/habit-tracker-card.js"])
+        self.assertEqual(cards, ["/habit_tracker/frontend/0.3.1/habit-tracker-card.js"])
         self.assertFalse(any(url.startswith("/habit_tracker/frontend/")
                              for url in self.hass.data[DATA_EXTRA_MODULE_URL].urls))
         # Only a static, credential-free module is publicly served; no directory exposure.
@@ -315,7 +321,7 @@ class HomeAssistantEndToEnd(unittest.IsolatedAsyncioTestCase):
             self.assertIn('customElements.define("habit-tracker-card"', card)
             self.assertNotIn(self.token, card)
             self.assertEqual(card, (CLIENT_ROOT / "custom_components/habit_tracker/www/habit-tracker-card.js").read_text())
-        async with self.session.get(f"http://127.0.0.1:{self.ha_port}/habit_tracker/frontend/0.3.0/manifest.json") as response:
+        async with self.session.get(f"http://127.0.0.1:{self.ha_port}/habit_tracker/frontend/0.3.1/manifest.json") as response:
             self.assertEqual(response.status, 404)
 
     async def test_card_resource_upgrades_without_touching_other_resources(self):
@@ -332,7 +338,7 @@ class HomeAssistantEndToEnd(unittest.IsolatedAsyncioTestCase):
         items = {item["id"]: item for item in resources.async_items()}
         self.assertEqual(len(items), 2)
         self.assertEqual(items[foreign["id"]], foreign)
-        self.assertEqual(items[previous["id"]]["url"], "/habit_tracker/frontend/0.3.0/habit-tracker-card.js")
+        self.assertEqual(items[previous["id"]]["url"], "/habit_tracker/frontend/0.3.1/habit-tracker-card.js")
         self.assertEqual(items[previous["id"]]["type"], "module")
         self.assertNotIn(duplicate["id"], items)
         self.assertTrue(await self.hass.config_entries.async_reload(result["result"].entry_id))
@@ -352,10 +358,10 @@ class HomeAssistantEndToEnd(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["result"].state, ConfigEntryState.LOADED)
         self.assertIs(lovelace.resources, resources)
         self.assertEqual(resources.async_items(), declared)
-        self.assertTrue(any("/habit_tracker/frontend/0.3.0/habit-tracker-card.js" in line for line in logs.output))
+        self.assertTrue(any("/habit_tracker/frontend/0.3.1/habit-tracker-card.js" in line for line in logs.output))
         self.assertFalse(any(url.startswith("/habit_tracker/frontend/")
                              for url in self.hass.data[DATA_EXTRA_MODULE_URL].urls))
-        async with self.session.get(f"http://127.0.0.1:{self.ha_port}/habit_tracker/frontend/0.3.0/habit-tracker-card.js") as response:
+        async with self.session.get(f"http://127.0.0.1:{self.ha_port}/habit_tracker/frontend/0.3.1/habit-tracker-card.js") as response:
             self.assertEqual(response.status, 200)
 
     async def test_transport_retry_reuses_key_and_redirect_never_receives_token(self):

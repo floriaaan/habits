@@ -321,6 +321,24 @@ impl Store {
         if habit.archived_at.is_some() {
             return Err(DomainError::Validation("habit is archived"));
         }
+        let set_value = input.action == HabitAction::SetValue;
+        if set_value {
+            if !matches!(
+                habit.definition.kind,
+                HabitKind::Quantity | HabitKind::Duration
+            ) || input
+                .value
+                .is_none_or(|v| !v.is_finite() || !(0.0..=1e12).contains(&v))
+            {
+                return Err(DomainError::Validation(
+                    "set_value requires quantity/duration and a finite value in 0..1e12",
+                ));
+            }
+        } else if input.value.is_some() {
+            return Err(DomainError::Validation(
+                "value is only allowed for set_value",
+            ));
+        }
         let bool_action = matches!(
             input.action,
             HabitAction::Complete | HabitAction::Uncomplete
@@ -347,27 +365,49 @@ impl Store {
             .collect::<Result<Vec<Entry>, _>>()?;
         let receipt_id = Uuid::new_v4();
         let tolerance = settings.step * 1e-9;
-        match input.action {
+        let current: f64 = sqlx::query_scalar("SELECT COALESCE(SUM(value),0.0) FROM entries WHERE user_id = ? AND habit_id = ? AND cancelled_at IS NULL AND local_date >= ? AND local_date <= ?")
+            .bind(actor.user_id.0.to_string()).bind(id.to_string()).bind(start).bind(today).fetch_one(&mut *tx).await.map_err(persistence)?;
+        let desired = input.value.unwrap_or(current);
+        let action = if set_value {
+            if desired >= current {
+                HabitAction::Increment
+            } else {
+                HabitAction::Decrement
+            }
+        } else {
+            input.action
+        };
+        match action {
             HabitAction::Complete | HabitAction::Increment => {
                 if input.action != HabitAction::Complete || manual.is_empty() {
-                    let value = if bool_action { 1.0 } else { settings.step };
-                    let entry = NewEntry {
-                        occurred_at: now,
-                        value,
+                    let value = if set_value {
+                        desired - current
+                    } else if bool_action {
+                        1.0
+                    } else {
+                        settings.step
                     };
-                    entry.validate(now)?;
-                    record_in_tx(
-                        &mut tx,
-                        actor.user_id,
-                        id,
-                        &format!("action:{receipt_id}:create"),
-                        entry,
-                    )
-                    .await?;
+                    if value > 0.0 {
+                        let entry = NewEntry {
+                            occurred_at: now,
+                            value,
+                        };
+                        entry.validate(now)?;
+                        record_in_tx(
+                            &mut tx,
+                            actor.user_id,
+                            id,
+                            &format!("action:{receipt_id}:create"),
+                            entry,
+                        )
+                        .await?;
+                    }
                 }
             }
             HabitAction::Uncomplete | HabitAction::Decrement => {
-                let mut remaining = if bool_action {
+                let mut remaining = if set_value {
+                    current - desired
+                } else if bool_action {
                     manual.iter().map(|e| e.value).sum::<f64>()
                 } else {
                     settings.step
@@ -396,6 +436,9 @@ impl Store {
                     )
                     .await?;
                 }
+            }
+            HabitAction::SetValue => {
+                return Err(DomainError::Validation("invalid action dispatch"));
             }
         }
         let progress: f64 = sqlx::query_scalar("SELECT COALESCE(SUM(value),0.0) FROM entries WHERE user_id = ? AND habit_id = ? AND cancelled_at IS NULL AND local_date >= ? AND local_date <= ?")

@@ -111,7 +111,8 @@ target:
   entity_id: sensor.habit_tracker_dashboard
 data:
   habit_id: UUID_DE_L_HABITUDE
-  action: increment # decrement, complete ou uncomplete
+  action: increment # decrement, complete, uncomplete ou set_value
+  # value: 750 # uniquement pour set_value : total dans l’unité canonique
 ```
 
 Les nouvelles habitudes créent automatiquement leurs entités au prochain snapshot.
@@ -263,3 +264,12 @@ validation de déploiement sur le homelab réel implicite.
 Contrats suivis : [config entries](https://contributors.home-assistant.io/core/integrations/config-entries/),
 [coordinator et push](https://contributors.home-assistant.io/core/integrations/fetching-data/),
 [cycle de vie des entités](https://contributors.home-assistant.io/core/entities/state-updates/).
+
+## Verres cliquables et action absolue (0.3.1)
+
+L'action `set_value` ajoute `value` (nombre fini entre 0 et 1e12) à la requête
+existante `POST /api/v1/habits/{id}/actions`. Elle exige `entries:write`, une clé
+d'idempotence et une habitude quantitative/de durée. La valeur vise le total de
+la période ; les réductions corrigent les entrées manuelles et compensent XP.
+Une valeur sous le solde fournisseur est refusée. Les autres actions refusent
+le champ `value`. Sans ce champ, leurs payloads/reçus restent identiques.

@@ -142,6 +142,7 @@ async fn actions_are_atomic_replayable_and_compensate_without_negative_entries()
         .unwrap();
     let request = || ActionRequest {
         action: HabitAction::Increment,
+        value: None,
     };
     let alice = actor(1);
     let (a, b) = tokio::join!(
@@ -156,6 +157,7 @@ async fn actions_are_atomic_replayable_and_compensate_without_negative_entries()
     assert_eq!(f.store.statistics(&actor(1), h.id).await.unwrap().xp, 10);
     let undo = || ActionRequest {
         action: HabitAction::Decrement,
+        value: None,
     };
     assert_eq!(
         f.store
@@ -196,6 +198,7 @@ async fn actions_are_atomic_replayable_and_compensate_without_negative_entries()
                 key,
                 ActionRequest {
                     action: HabitAction::Complete,
+                    value: None,
                 },
             )
             .await
@@ -212,6 +215,7 @@ async fn actions_are_atomic_replayable_and_compensate_without_negative_entries()
             "not-done",
             ActionRequest {
                 action: HabitAction::Uncomplete,
+                value: None,
             },
         )
         .await
@@ -241,7 +245,8 @@ async fn receipt_failure_rolls_back_entries_xp_and_revision() {
                 h.id,
                 "rollback",
                 ActionRequest {
-                    action: HabitAction::Complete
+                    action: HabitAction::Complete,
+                    value: None,
                 }
             )
             .await
@@ -286,6 +291,7 @@ async fn fractional_and_tiny_steps_can_be_undone_to_zero() {
                     &format!("fraction:{}:{n}", h.id),
                     ActionRequest {
                         action: HabitAction::Decrement,
+                        value: None,
                     },
                 )
                 .await
@@ -333,12 +339,45 @@ async fn decrement_cannot_remove_provider_entries() {
                 h.id,
                 "provider-undo",
                 ActionRequest {
-                    action: HabitAction::Decrement
+                    action: HabitAction::Decrement,
+                    value: None,
                 }
             )
             .await,
         Err(DomainError::Conflict)
     ));
+    let set = |value| ActionRequest {
+        action: HabitAction::SetValue,
+        value: Some(value),
+    };
+    assert!(matches!(
+        f.store
+            .habit_action(&actor(1), h.id, "provider-set-zero", set(0.0))
+            .await,
+        Err(DomainError::Conflict)
+    ));
+    assert_eq!(
+        f.store
+            .habit_action(&actor(1), h.id, "provider-set-75", set(75.0))
+            .await
+            .unwrap()
+            .progress,
+        75.0
+    );
+    assert!(matches!(
+        f.store
+            .habit_action(&actor(1), h.id, "provider-set-25", set(25.0))
+            .await,
+        Err(DomainError::Conflict)
+    ));
+    assert_eq!(
+        f.store
+            .habit_action(&actor(1), h.id, "provider-set-50", set(50.0))
+            .await
+            .unwrap()
+            .progress,
+        50.0
+    );
     assert_eq!(
         f.store
             .statistics(&actor(1), h.id)
@@ -432,4 +471,79 @@ async fn rests_weights_presentation_validation_and_timezones_are_preserved() {
             .with_timezone(&chrono_tz::Pacific::Kiritimati)
             .date_naive()
     );
+}
+
+#[tokio::test]
+async fn direct_value_is_atomic_scoped_idempotent_and_compensates_xp() {
+    let f = Fixture::new().await;
+    let h = habit(
+        &f.store,
+        HabitCategory::Nutrition,
+        5.0,
+        HabitKind::Quantity,
+        0.0,
+    )
+    .await;
+    let request = |value| ActionRequest {
+        action: HabitAction::SetValue,
+        value: Some(value),
+    };
+    let alice = actor(1);
+    let (a, b) = tokio::join!(
+        f.store.habit_action(&alice, h.id, "set", request(5.0)),
+        f.store.habit_action(&alice, h.id, "set", request(5.0))
+    );
+    assert_eq!(a.unwrap().id, b.unwrap().id);
+    assert_eq!(f.count("entries").await, 1);
+    assert_eq!(f.store.statistics(&alice, h.id).await.unwrap().xp, 10);
+    assert!(matches!(
+        f.store
+            .habit_action(&actor(2), h.id, "other", request(2.0))
+            .await,
+        Err(DomainError::NotFound)
+    ));
+    assert!(matches!(
+        f.store
+            .habit_action(&alice, h.id, "set", request(2.0))
+            .await,
+        Err(DomainError::Conflict)
+    ));
+    assert_eq!(
+        f.store
+            .habit_action(&alice, h.id, "lower", request(2.0))
+            .await
+            .unwrap()
+            .progress,
+        2.0
+    );
+    assert_eq!(f.store.statistics(&alice, h.id).await.unwrap().xp, 0);
+    assert_eq!(
+        f.store
+            .habit_action(&alice, h.id, "zero", request(0.0))
+            .await
+            .unwrap()
+            .progress,
+        0.0
+    );
+    for value in [f64::NAN, -1.0, f64::INFINITY, 1e13] {
+        assert!(matches!(
+            f.store
+                .habit_action(&alice, h.id, "invalid", request(value))
+                .await,
+            Err(DomainError::Validation(_))
+        ));
+    }
+    let mut read_only = actor(1);
+    read_only.scopes = vec![Scope::HabitsRead];
+    assert!(matches!(
+        f.store
+            .habit_action(&read_only, h.id, "scope", request(1.0))
+            .await,
+        Err(DomainError::Forbidden)
+    ));
+    let receipts: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM action_receipts")
+        .fetch_one(&f.store.pool)
+        .await
+        .unwrap();
+    assert_eq!(receipts, 3);
 }

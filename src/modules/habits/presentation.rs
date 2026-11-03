@@ -102,12 +102,15 @@ pub enum HabitAction {
     Uncomplete,
     Increment,
     Decrement,
+    SetValue,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ActionRequest {
     pub action: HabitAction,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub value: Option<f64>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
