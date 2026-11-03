@@ -4,6 +4,14 @@ use chrono::NaiveTime;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct HabitSetup {
+    pub habit: NewHabit,
+    #[serde(default)]
+    pub presentation: Presentation,
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum Illustration {

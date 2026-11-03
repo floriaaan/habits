@@ -19,6 +19,7 @@ mod dashboard;
 mod dashboard_tests;
 pub(crate) mod integrations;
 mod jobs;
+mod onboarding;
 mod reminders;
 mod tracking;
 #[cfg(test)]
@@ -138,39 +139,48 @@ async fn owned_habit(
     Ok(habit)
 }
 
+async fn insert_habit(
+    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    user: UserId,
+    input: NewHabit,
+) -> Result<Habit, DomainError> {
+    let habit = Habit {
+        id: Uuid::new_v4(),
+        user_id: user,
+        definition: input,
+        created_at: Utc::now(),
+        archived_at: None,
+    };
+    let definition = serde_json::to_string(&habit.definition).map_err(persistence)?;
+    let schedule = serde_json::to_string(&habit.definition.schedule).map_err(persistence)?;
+    sqlx::query("INSERT INTO habits (id, user_id, definition, created_at) VALUES (?, ?, ?, ?)")
+        .bind(habit.id.to_string())
+        .bind(user.0.to_string())
+        .bind(definition)
+        .bind(habit.created_at)
+        .execute(&mut **tx)
+        .await
+        .map_err(persistence)?;
+    sqlx::query("INSERT INTO schedules (habit_id, user_id, definition) VALUES (?, ?, ?)")
+        .bind(habit.id.to_string())
+        .bind(user.0.to_string())
+        .bind(schedule)
+        .execute(&mut **tx)
+        .await
+        .map_err(persistence)?;
+    sqlx::query("INSERT INTO habit_versions (id, user_id, habit_id, effective_from, definition, created_at) VALUES (?, ?, ?, '1970-01-01', ?, ?)")
+            .bind(habit.id.to_string()).bind(user.0.to_string()).bind(habit.id.to_string()).bind(serde_json::to_string(&habit.definition).map_err(persistence)?).bind(habit.created_at).execute(&mut **tx).await.map_err(persistence)?;
+    Ok(habit)
+}
+
 impl HabitRepository for Store {
     async fn create(&self, user: UserId, input: NewHabit) -> Result<Habit, DomainError> {
-        let habit = Habit {
-            id: Uuid::new_v4(),
-            user_id: user,
-            definition: input,
-            created_at: Utc::now(),
-            archived_at: None,
-        };
-        let definition = serde_json::to_string(&habit.definition).map_err(persistence)?;
-        let schedule = serde_json::to_string(&habit.definition.schedule).map_err(persistence)?;
         let mut tx = self
             .pool
             .begin_with("BEGIN IMMEDIATE")
             .await
             .map_err(persistence)?;
-        sqlx::query("INSERT INTO habits (id, user_id, definition, created_at) VALUES (?, ?, ?, ?)")
-            .bind(habit.id.to_string())
-            .bind(user.0.to_string())
-            .bind(definition)
-            .bind(habit.created_at)
-            .execute(&mut *tx)
-            .await
-            .map_err(persistence)?;
-        sqlx::query("INSERT INTO schedules (habit_id, user_id, definition) VALUES (?, ?, ?)")
-            .bind(habit.id.to_string())
-            .bind(user.0.to_string())
-            .bind(schedule)
-            .execute(&mut *tx)
-            .await
-            .map_err(persistence)?;
-        sqlx::query("INSERT INTO habit_versions (id, user_id, habit_id, effective_from, definition, created_at) VALUES (?, ?, ?, '1970-01-01', ?, ?)")
-            .bind(habit.id.to_string()).bind(user.0.to_string()).bind(habit.id.to_string()).bind(serde_json::to_string(&habit.definition).map_err(persistence)?).bind(habit.created_at).execute(&mut *tx).await.map_err(persistence)?;
+        let habit = insert_habit(&mut tx, user, input).await?;
         tx.commit().await.map_err(persistence)?;
         Ok(habit)
     }

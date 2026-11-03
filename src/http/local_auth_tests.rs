@@ -64,6 +64,112 @@ async fn call(
 }
 
 #[tokio::test]
+async fn guided_habit_setup_checks_scopes_validation_and_replay() {
+    let f = Fixture::new().await;
+    let admin = f.store.bootstrap_local("UTC").await.unwrap();
+    let reader = f
+        .store
+        .issue_local_token(
+            admin.metadata.user_id,
+            NewToken {
+                scopes: vec![Scope::HabitsRead],
+                expires_at: Utc::now() + Duration::hours(1),
+                service_account_id: None,
+            },
+        )
+        .await
+        .unwrap();
+    let app = router_with_auth(f.store.clone(), AuthMode::Tokens);
+    let path = "/api/v1/habits/setup";
+    let body = json!({"habit":{"name":"Reading", "category":"mind", "kind":"boolean", "unit":"count", "target":1, "timezone":"UTC"}});
+    assert_eq!(
+        call(&app, "POST", path, None, Some(body.clone()), Some("setup"))
+            .await
+            .0,
+        StatusCode::UNAUTHORIZED
+    );
+    assert_eq!(
+        call(
+            &app,
+            "POST",
+            path,
+            Some(&reader.token),
+            Some(body.clone()),
+            Some("setup")
+        )
+        .await
+        .0,
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        call(
+            &app,
+            "POST",
+            path,
+            Some(&admin.token),
+            Some(body.clone()),
+            None
+        )
+        .await
+        .0,
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+    let mut invalid = body.clone();
+    invalid["habit"]["timezone"] = json!("not-a-zone");
+    assert_eq!(
+        call(
+            &app,
+            "POST",
+            path,
+            Some(&admin.token),
+            Some(invalid),
+            Some("setup")
+        )
+        .await
+        .0,
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+    let (status, first) = call(
+        &app,
+        "POST",
+        path,
+        Some(&admin.token),
+        Some(body.clone()),
+        Some("setup"),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    assert_eq!(
+        call(
+            &app,
+            "POST",
+            path,
+            Some(&admin.token),
+            Some(body.clone()),
+            Some("setup")
+        )
+        .await
+        .1,
+        first
+    );
+    let mut changed = body;
+    changed["habit"]["name"] = json!("Other name");
+    assert_eq!(
+        call(
+            &app,
+            "POST",
+            path,
+            Some(&admin.token),
+            Some(changed),
+            Some("setup")
+        )
+        .await
+        .0,
+        StatusCode::CONFLICT
+    );
+}
+
+#[tokio::test]
 async fn dashboard_actions_and_sse_enforce_auth_scopes_and_revocation() {
     let fixture = Fixture::new().await;
     let foreign = fixture.habit().await;

@@ -125,6 +125,91 @@ class HomeAssistantEndToEnd(unittest.IsolatedAsyncioTestCase):
             "name": name, "kind": kind, "unit": "milliliters" if kind == "quantity" else "count",
             "target": 500 if kind == "quantity" else 1, "timezone": "UTC", "category": "nutrition" if kind == "quantity" else "mind"})
 
+    async def configure_integration(self, token=None):
+        flow = await self.hass.config_entries.flow.async_init("habit_tracker", context={"source": "user"})
+        result = await self.hass.config_entries.flow.async_configure(flow["flow_id"], {
+            "url": self.url, "token": token or self.token, "allow_http": True})
+        await self.hass.async_block_till_done()
+        self.assertEqual(result["result"].state, ConfigEntryState.LOADED)
+        return result["result"]
+
+    def form_defaults(self, form):
+        return {field.schema: field.default() for field in form["data_schema"].schema}
+
+    async def test_options_onboarding_presets_custom_validation_and_lost_response(self):
+        entry = await self.configure_integration()
+        from custom_components.habit_tracker.api import HabitApi
+        from custom_components.habit_tracker.presets import PRESETS
+        flow = await self.hass.config_entries.options.async_init(entry.entry_id)
+        self.assertEqual(flow["type"], "menu")
+        original = HabitApi.request
+        keys = []
+
+        async def lose_first_creation_response(api, method, path, **kwargs):
+            result = await original(api, method, path, **kwargs)
+            if path == "/api/v1/habits/setup":
+                keys.append(kwargs["key"])
+                if len(keys) == 1:
+                    raise aiohttp.ClientConnectionError("isolated lost response")
+            return result
+
+        with patch.object(HabitApi, "request", new=lose_first_creation_response):
+            for preset in PRESETS:
+                chosen = await self.hass.config_entries.options.async_configure(flow["flow_id"], {"next_step_id": "preset"})
+                form = await self.hass.config_entries.options.async_configure(chosen["flow_id"], {"preset": preset})
+                values = self.form_defaults(form)
+                if preset == "water":
+                    values.update(name="My water", target=1500, timezone="Europe/Paris")
+                result = await self.hass.config_entries.options.async_configure(form["flow_id"], values)
+                self.assertEqual((result["type"], result["step_id"]), ("menu", "created"))
+        self.assertEqual(len(keys), 8)
+        self.assertEqual(keys[0], keys[1])
+        self.assertEqual(len(entry.runtime_data.habits()), 7)
+        water = next(item for item in entry.runtime_data.habits().values() if item["habit"]["name"] == "My water")
+        self.assertEqual(water["habit"]["timezone"], "Europe/Paris")
+        self.assertEqual(water["target"], 1500)
+        self.assertEqual(water["presentation"]["step"], 250)
+        self.assertEqual(water["presentation"]["illustration"], "water")
+        form = await self.hass.config_entries.options.async_configure(result["flow_id"], {"next_step_id": "custom"})
+        values = self.form_defaults(form)
+        values.update(name="Walk", kind="frequency", category="sport", target=3, period="weekly")
+        result = await self.hass.config_entries.options.async_configure(form["flow_id"], values)
+        self.assertEqual(result["step_id"], "created")
+        form = await self.hass.config_entries.options.async_configure(result["flow_id"], {"next_step_id": "custom"})
+        values = self.form_defaults(form)
+        values.update(name="Invalid duration", kind="duration", unit="count")
+        invalid = await self.hass.config_entries.options.async_configure(form["flow_id"], values)
+        self.assertEqual(invalid["errors"], {"base": "invalid_habit"})
+        self.assertEqual(len(entry.runtime_data.habits()), 8)
+        values.update(name="Rest routine", kind="boolean")
+        result = await self.hass.config_entries.options.async_configure(form["flow_id"], values)
+        finished = await self.hass.config_entries.options.async_configure(result["flow_id"], {"next_step_id": "finish"})
+        self.assertEqual(finished["type"], "create_entry")
+        await self.wait_until(lambda: len(self.hass.states.async_all("switch")) == 3)
+        self.assertEqual(len(entry.runtime_data.habits()), 9)
+        self.assertEqual((await self.request("GET", "/api/v1/gamification"))["xp"], 0)
+
+    async def test_onboarding_requires_write_scope_and_reconfigure_preserves_account(self):
+        limited = await self.request("POST", "/api/v1/tokens", {
+            "scopes": ["habits:read", "statistics:read", "entries:write"],
+            "expires_at": (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat(), "service_account_id": None})
+        entry = await self.configure_integration(limited["token"])
+        flow = await self.hass.config_entries.options.async_init(entry.entry_id)
+        form = await self.hass.config_entries.options.async_configure(flow["flow_id"], {"next_step_id": "custom"})
+        values = self.form_defaults(form)
+        values["name"] = "New routine"
+        denied = await self.hass.config_entries.options.async_configure(form["flow_id"], values)
+        self.assertEqual(denied["errors"], {"base": "write_forbidden"})
+        self.assertEqual(entry.runtime_data.habits(), {})
+        self.assertEqual(entry.state, ConfigEntryState.LOADED)
+        reconfigure = await self.hass.config_entries.flow.async_init("habit_tracker", context={"source": "reconfigure", "entry_id": entry.entry_id})
+        updated = await self.hass.config_entries.flow.async_configure(reconfigure["flow_id"], {"token": self.token})
+        self.assertEqual(updated["reason"], "reconfigure_successful")
+        await self.hass.async_block_till_done()
+        result = await self.hass.config_entries.options.async_configure(form["flow_id"], values)
+        self.assertEqual(result["step_id"], "created")
+        self.assertEqual(len(entry.runtime_data.habits()), 1)
+
     async def wait_until(self, predicate):
         for _ in range(100):
             if predicate():
@@ -203,7 +288,7 @@ class HomeAssistantEndToEnd(unittest.IsolatedAsyncioTestCase):
         items = [item for item in result["result"] if item["url"].startswith("/habit_tracker/frontend/")]
         self.assertEqual([item["type"] for item in items], ["module"])
         cards = [item["url"] for item in items]
-        self.assertEqual(cards, ["/habit_tracker/frontend/0.1.2/habit-tracker-card.js"])
+        self.assertEqual(cards, ["/habit_tracker/frontend/0.2.0/habit-tracker-card.js"])
         self.assertFalse(any(url.startswith("/habit_tracker/frontend/")
                              for url in self.hass.data[DATA_EXTRA_MODULE_URL].urls))
         # Only a static, credential-free module is publicly served; no directory exposure.
@@ -213,7 +298,7 @@ class HomeAssistantEndToEnd(unittest.IsolatedAsyncioTestCase):
             self.assertIn('customElements.define("habit-tracker-card"', card)
             self.assertNotIn(self.token, card)
             self.assertEqual(card, (CLIENT_ROOT / "custom_components/habit_tracker/www/habit-tracker-card.js").read_text())
-        async with self.session.get(f"http://127.0.0.1:{self.ha_port}/habit_tracker/frontend/0.1.2/manifest.json") as response:
+        async with self.session.get(f"http://127.0.0.1:{self.ha_port}/habit_tracker/frontend/0.2.0/manifest.json") as response:
             self.assertEqual(response.status, 404)
 
     async def test_card_resource_upgrades_without_touching_other_resources(self):
@@ -230,7 +315,7 @@ class HomeAssistantEndToEnd(unittest.IsolatedAsyncioTestCase):
         items = {item["id"]: item for item in resources.async_items()}
         self.assertEqual(len(items), 2)
         self.assertEqual(items[foreign["id"]], foreign)
-        self.assertEqual(items[previous["id"]]["url"], "/habit_tracker/frontend/0.1.2/habit-tracker-card.js")
+        self.assertEqual(items[previous["id"]]["url"], "/habit_tracker/frontend/0.2.0/habit-tracker-card.js")
         self.assertEqual(items[previous["id"]]["type"], "module")
         self.assertNotIn(duplicate["id"], items)
         self.assertTrue(await self.hass.config_entries.async_reload(result["result"].entry_id))
@@ -250,10 +335,10 @@ class HomeAssistantEndToEnd(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["result"].state, ConfigEntryState.LOADED)
         self.assertIs(lovelace.resources, resources)
         self.assertEqual(resources.async_items(), declared)
-        self.assertTrue(any("/habit_tracker/frontend/0.1.2/habit-tracker-card.js" in line for line in logs.output))
+        self.assertTrue(any("/habit_tracker/frontend/0.2.0/habit-tracker-card.js" in line for line in logs.output))
         self.assertFalse(any(url.startswith("/habit_tracker/frontend/")
                              for url in self.hass.data[DATA_EXTRA_MODULE_URL].urls))
-        async with self.session.get(f"http://127.0.0.1:{self.ha_port}/habit_tracker/frontend/0.1.2/habit-tracker-card.js") as response:
+        async with self.session.get(f"http://127.0.0.1:{self.ha_port}/habit_tracker/frontend/0.2.0/habit-tracker-card.js") as response:
             self.assertEqual(response.status, 200)
 
     async def test_transport_retry_reuses_key_and_redirect_never_receives_token(self):

@@ -17,6 +17,7 @@ Le dépôt public d'installation est
 [floriaaan/habit-tracker-ha](https://github.com/floriaaan/habit-tracker-ha).
 Première release : [v0.1.1](https://github.com/floriaaan/habit-tracker-ha/releases/tag/v0.1.1).
 Correctif de chargement : [v0.1.2](https://github.com/floriaaan/habit-tracker-ha/releases/tag/v0.1.2).
+Onboarding et éditeur visuel : **0.2.0**.
 Le client est un sous-module verrouillé du backend `floriaaan/habits`
 à `integrations/home-assistant/habit-tracker-ha`. Pour préparer le poste :
 
@@ -30,7 +31,7 @@ contient l'arborescence du dépôt de distribution (`hacs.json`, README, licence
 `custom_components/habit_tracker/`) ; `target/hacs/habit_tracker.zip` contient
 uniquement le composant à extraire dans `/config/custom_components/habit_tracker/`.
 La commande ne publie rien ; ces archives de secours suivent le commit verrouillé.
-La CI privée teste les archives et l'intégration avec Rust. HACS et Hassfest
+La CI du backend teste les archives et l'intégration avec Rust. HACS et Hassfest
 s'exécutent dans le dépôt public. Aucune admission au catalogue HACS n'est revendiquée.
 
 Dans **HACS → ⋮ → Dépôts personnalisés**, saisir
@@ -62,7 +63,8 @@ Aucun secret HA n'est requis pour cette copie.
    restent refusées sans token ; `disabled` ne signifie pas accès anonyme.
 2. Créer un PAT ou un token de compte de service du bon utilisateur :
    `habits:read`, `statistics:read`, `entries:write`. Les deux premiers suffisent
-   aux lectures ; le dernier est indispensable aux boutons. Utiliser le token
+   aux lectures ; le dernier est indispensable aux boutons. Ajouter `habits:write`
+   pour créer les habitudes depuis HA. Utiliser le token
    initial affiché au premier démarrage local ou la CLI, puis créer un token dédié.
 3. Redémarrer HA après installation du composant Python. Dans **Paramètres → Appareils et
    services → Ajouter une intégration → Habit Tracker**, renseigner URL et token.
@@ -72,9 +74,18 @@ Aucun secret HA n'est requis pour cette copie.
    automatiquement en mode UI/storage ; en YAML, déclarer l'URL versionnée. En
    migration, retirer l'ancienne ressource `/local/habit-tracker/habit-tracker-card.js?...`
    pour éviter de charger une ancienne version. Conserver la config entry existante.
-5. Importer la vue de
+5. Dans **Habit Tracker → Configurer**, choisir un des sept presets (lecture,
+   méditation, rangement, hydratation, fruits/légumes, course, natation) ou la
+   création libre. Modifier nom, catégorie, type, unité, cible, période, pas et
+   fuseau avant de confirmer. Les entités apparaissent après création. Ce parcours
+   exige le backend avec la migration `0007` ; un ancien backend affiche une erreur
+   explicite. Pour remplacer un token valide sans `habits:write`, utiliser
+   **⋮ → Reconfigurer** sur l'entrée, avec un token du même utilisateur.
+6. Dans le dashboard, **Modifier → Ajouter une carte → Habit Tracker** : choisir
+   le capteur Dashboard, la vue et éventuellement la catégorie dans l'éditeur
+   visuel. Le YAML reste disponible, ainsi que la vue complète
    [dashboard.yaml](../integrations/home-assistant/habit-tracker-ha/custom_components/habit_tracker/www/dashboard.yaml).
-   Remplacer `sensor.habit_tracker_dashboard` si HA a choisi un autre identifiant.
+   Utiliser le véritable identifiant du capteur Dashboard.
 
 Le token est conservé dans les config entries côté serveur HA. Protéger le dossier
 `.storage` et ses sauvegardes comme les autres credentials HA. Les permissions du
@@ -109,6 +120,24 @@ Un retrait supérieur au solde manuel est refusé (409). Les entrées Strava ne 
 jamais supprimées par les boutons. En cas de coupure réseau, le client réessaie
 avec la même clé d'idempotence ; après un échec final, vérifier l'état avant une
 nouvelle action humaine. Aucun état optimiste n'est enregistré comme une réussite.
+
+## Création depuis HA et API
+
+`POST /api/v1/habits/setup`, scope `habits:write`, prend `{habit, presentation}`
+et un header `Idempotency-Key` obligatoire (1 à 128 caractères ASCII visibles).
+`habit` suit le même contrat que la création existante ; `presentation` suit le
+contrat ci-dessous. L'ensemble est validé et créé dans une seule transaction,
+avec sa planification et sa version initiale. Répéter exactement la même requête
+avec la même clé renvoie le même objet (201) ; modifier le contenu avec cette clé
+renvoie 409. Les reçus sont isolés par utilisateur et conservés avec l'habitude.
+L'ancien `POST /api/v1/habits` reste disponible.
+
+Les sept presets sont des suggestions dans le client HA, jamais des fixtures
+créées automatiquement. La méditation est proposée comme durée de 600 secondes,
+les sports en mètres et par semaine ; les autres objectifs sont quotidiens.
+Le fuseau HA est proposé, puis validé par le backend. La modification d'habitudes
+existantes, des fenêtres d'éligibilité, des repos et des rappels passe encore par
+l'API ; cet assistant couvre leur création et les paramètres de base.
 
 ## Métadonnées et rappels
 

@@ -650,6 +650,86 @@
         ]
       }
     },
+    "/api/v1/habits/setup": {
+      "post": {
+        "tags": [
+          "super::dashboard"
+        ],
+        "operationId": "setup",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HabitSetup"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Habit"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/habits/{habit_id}": {
       "get": {
         "tags": [
@@ -3226,6 +3306,21 @@
             "minimum": 0
           }
         }
+      },
+      "HabitSetup": {
+        "type": "object",
+        "required": [
+          "habit"
+        ],
+        "properties": {
+          "habit": {
+            "$ref": "#/components/schemas/NewHabit"
+          },
+          "presentation": {
+            "$ref": "#/components/schemas/Presentation"
+          }
+        },
+        "additionalProperties": false
       },
       "HabitStatistics": {
         "type": "object",

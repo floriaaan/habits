@@ -102,12 +102,15 @@ run `docker compose pull && docker compose up --detach --wait`.
 
 For each setting and where to obtain it, see [Environment variables](#environment-variables).
 
+Create your habits in **HA → Settings → Devices & services → Habit Tracker → Configure**.
+The seven presets are editable before confirmation; custom habits are supported.
+This requires `habits:write` on the HA token. Cards also have a visual Lovelace editor.
+
 ## Development
 
 ### Clone the backend and HA client
 
-The backend repository is private; GitHub access is required. The public HA
-client is pinned as a Git submodule.
+The HA client is pinned as a Git submodule in the backend repository.
 
 ```sh
 git clone --recurse-submodules https://github.com/floriaaan/habits.git

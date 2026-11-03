@@ -6,7 +6,10 @@ use crate::{
     infrastructure::database::Store,
     modules::{
         auth::{Principal, Scope},
-        habits::presentation::{ActionReceipt, ActionRequest, Presentation},
+        habits::{
+            Habit,
+            presentation::{ActionReceipt, ActionRequest, HabitSetup, Presentation},
+        },
         statistics::dashboard::Dashboard,
     },
 };
@@ -33,6 +36,24 @@ pub(super) fn routes() -> Router<Store> {
         .route("/api/v1/dashboard/events", get(events))
         .route("/api/v1/habits/{habit_id}/presentation", put(presentation))
         .route("/api/v1/habits/{habit_id}/actions", post(action))
+        .route("/api/v1/habits/setup", post(setup))
+}
+
+#[utoipa::path(post, path="/api/v1/habits/setup", params(("Idempotency-Key"=String,Header)), request_body=HabitSetup, security(("bearer"=[])), responses((status=201,body=Habit),(status=401,body=ErrorEnvelope),(status=403,body=ErrorEnvelope),(status=409,body=ErrorEnvelope),(status=422,body=ErrorEnvelope)))]
+pub(super) async fn setup(
+    State(store): State<Store>,
+    Extension(actor): Extension<Principal>,
+    headers: HeaderMap,
+    body: Result<Json<HabitSetup>, JsonRejection>,
+) -> Result<(StatusCode, Json<Habit>), ApiError> {
+    let key = headers
+        .get("idempotency-key")
+        .and_then(|h| h.to_str().ok())
+        .ok_or_else(|| ApiError::validation("Idempotency-Key is required"))?;
+    Ok((
+        StatusCode::CREATED,
+        Json(store.setup_habit(&actor, key, json(body)?).await?),
+    ))
 }
 
 #[utoipa::path(get, path="/api/v1/dashboard", security(("bearer"=[])), responses((status=200,body=Dashboard),(status=401,body=ErrorEnvelope),(status=403,body=ErrorEnvelope),(status=422,body=ErrorEnvelope)))]
