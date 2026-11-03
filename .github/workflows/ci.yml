@@ -148,7 +148,15 @@ jobs:
 
   build-and-push:
     needs: [publication, rust, security, container, home-assistant]
-    if: needs.publication.outputs.publish == 'true'
+    # Keep the trusted event guard outside repository-controlled Python outputs:
+    # a PR editing the policy script must never reach a write-enabled job.
+    if: >-
+      needs.publication.outputs.publish == 'true' &&
+      github.event.repository.fork == false &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event_name == 'push' &&
+        (github.ref == format('refs/heads/{0}', github.event.repository.default_branch) ||
+         startsWith(github.ref, 'refs/tags/v'))))
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
