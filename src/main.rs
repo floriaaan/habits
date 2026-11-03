@@ -4,7 +4,6 @@ use habit_tracker::{
     infrastructure::database::Store,
 };
 use std::{error::Error, path::Path};
-use tracing_subscriber::EnvFilter;
 use utoipa::OpenApi;
 
 #[tokio::main]
@@ -36,11 +35,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     if !valid {
         return Err("usage: habit-tracker [openapi|healthcheck|backup DEST|bootstrap-local TIMEZONE|bootstrap-admin ISSUER SUBJECT TIMEZONE|user-create ISSUER SUBJECT TIMEZONE|token-create USER_ID SCOPES EXPIRES_AT [SERVICE_ACCOUNT_ID]]".into());
     }
-    tracing_subscriber::fmt()
-        .json()
-        .with_env_filter(EnvFilter::try_new(&config.log_filter)?)
-        .try_init()
-        .map_err(|_| "cannot initialize tracing")?;
+    let _logging = habit_tracker::infrastructure::observability::init(&config).await?;
     if let Some(parent) = config
         .database_path
         .parent()
@@ -166,6 +161,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         worker.abort();
         let _ = worker.await;
     }
+    tracing::info!("API shutdown completed");
     store.close().await;
     Ok(())
 }

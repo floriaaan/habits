@@ -95,7 +95,9 @@ impl Store {
                 .unwrap_or(0),
         )
     }
+    #[tracing::instrument(skip_all, fields(operation = "dashboard"), err)]
     pub async fn dashboard(&self, actor: &Principal) -> Result<Dashboard, DomainError> {
+        tracing::info!("dashboard started");
         self.dashboard_at(actor, Utc::now()).await
     }
     pub async fn dashboard_at(
@@ -255,12 +257,14 @@ impl Store {
             streak_91_days,
         })
     }
+    #[tracing::instrument(skip_all, fields(operation = "set_presentation"), err)]
     pub async fn set_presentation(
         &self,
         actor: &Principal,
         id: Uuid,
         input: Presentation,
     ) -> Result<Presentation, DomainError> {
+        tracing::info!("set presentation started");
         actor.require(Scope::HabitsWrite)?;
         let mut tx = self
             .pool
@@ -287,6 +291,7 @@ impl Store {
         tx.commit().await.map_err(persistence)?;
         Ok(input)
     }
+    #[tracing::instrument(skip_all, fields(operation = "habit_action"), err)]
     pub async fn habit_action(
         &self,
         actor: &Principal,
@@ -294,6 +299,7 @@ impl Store {
         key: &str,
         input: ActionRequest,
     ) -> Result<ActionReceipt, DomainError> {
+        tracing::info!("habit action started");
         actor.require(Scope::EntriesWrite)?;
         if key.is_empty() || key.len() > 128 || !key.bytes().all(|v| v.is_ascii_graphic()) {
             return Err(DomainError::Validation(

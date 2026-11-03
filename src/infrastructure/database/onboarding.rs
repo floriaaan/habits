@@ -7,12 +7,14 @@ use crate::modules::{
 use sqlx::Row;
 
 impl Store {
+    #[tracing::instrument(skip_all, fields(operation = "setup_habit"), err)]
     pub async fn setup_habit(
         &self,
         actor: &Principal,
         key: &str,
         mut input: HabitSetup,
     ) -> Result<Habit, DomainError> {
+        tracing::info!("setup habit started");
         actor.require(Scope::HabitsWrite)?;
         if key.is_empty() || key.len() > 128 || !key.bytes().all(|v| v.is_ascii_graphic()) {
             return Err(DomainError::Validation("invalid idempotency key"));
@@ -33,6 +35,7 @@ impl Store {
             }
             let receipt = row.try_get::<String, _>("receipt").map_err(persistence)?;
             tx.commit().await.map_err(persistence)?;
+            tracing::info!("habit setup replay returned existing receipt");
             return serde_json::from_str(&receipt).map_err(persistence);
         }
         let habit = insert_habit(&mut tx, actor.user_id, input.habit).await?;
@@ -50,6 +53,7 @@ impl Store {
             .bind(serde_json::to_string(&habit).map_err(persistence)?)
             .execute(&mut *tx).await.map_err(persistence)?;
         tx.commit().await.map_err(persistence)?;
+        tracing::info!(habit_id=%habit.id, "habit setup committed");
         Ok(habit)
     }
 }

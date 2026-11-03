@@ -51,6 +51,9 @@ services:
       STRAVA_MULTI_ATHLETE_APPROVED: ${STRAVA_MULTI_ATHLETE_APPROVED:-}
       HOME_ASSISTANT_URL: ${HOME_ASSISTANT_URL:-}
       HOME_ASSISTANT_ALLOW_HTTP: ${HOME_ASSISTANT_ALLOW_HTTP:-}
+      OTEL_EXPORTER_OTLP_LOGS_ENDPOINT: ${OTEL_EXPORTER_OTLP_LOGS_ENDPOINT:-}
+      OTEL_EXPORTER_OTLP_LOGS_HEADERS: ${OTEL_EXPORTER_OTLP_LOGS_HEADERS:-}
+      OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-habit-tracker}
       RUST_LOG: ${RUST_LOG:-habit_tracker=info,tower_http=info}
     ports:
       - "${HOST_BIND:-127.0.0.1}:${HOST_PORT:-8080}:8080"
@@ -180,6 +183,9 @@ or outbound HA notifications, the installation Compose values are sufficient.
 | `LISTEN_ADDR` | `0.0.0.0:8080` | API listen address inside the container. | [Configure the API](#docker-and-api) |
 | `DATABASE_PATH` | `/data/habits.sqlite` | SQLite database path inside the container. | [Choose storage](#docker-and-api) |
 | `RUST_LOG` | `habit_tracker=info,tower_http=info` | Application log filter. | [Choose logging](#docker-and-api) |
+| `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` | `http://alloy:4318/v1/logs` | Optional full OTLP HTTP logs receiver URL. | [Obtain the endpoint](#observability) |
+| `OTEL_EXPORTER_OTLP_LOGS_HEADERS` | `Authorization=Bearer%20<collector-token>` | Optional collector authentication headers. | [Obtain headers](#observability) |
+| `OTEL_SERVICE_NAME` | `habit-tracker` | Collector service label. | [Choose a label](#observability) |
 | `AUTH_MODE` | `local` | `local` authentication (`tokens` alias), `oidc`, or closed routes with `disabled`. | [Choose a mode](#authentication) |
 | `OIDC_ISSUER` | `https://id.example.com` | Provider's exact HTTPS issuer. | [Read OIDC settings](#oidc) |
 | `OIDC_AUDIENCE` | `habit-tracker-api` | Expected access token audience for this API. | [Confirm the audience](#oidc) |
@@ -219,6 +225,23 @@ Compose automatically reads the `.env` next to `compose.yaml` for `${…}` value
 under `environment` if needed. `cargo run` requires exported environment variables
 and does not read `.env`. After changing Compose variables, recreate the service
 with `docker compose up --detach --wait`.
+
+### Observability
+
+Set `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` to the collector's complete OTLP HTTP
+logs URL, for example `http://alloy:4318/v1/logs` on your trusted Docker network.
+Ask the collector administrator for the endpoint and any authentication headers.
+Use HTTPS outside a trusted local network. `OTEL_EXPORTER_OTLP_LOGS_HEADERS`
+uses the SDK's comma-separated `key=value` format; keep credentials in your
+secret environment. Choose an `OTEL_SERVICE_NAME` label, default `habit-tracker`.
+Leave the endpoint empty to keep console-only logging.
+
+JSON console logs remain enabled. Request IDs correlate request start, scoped
+use cases, errors and response status/duration. The exporter batches in a bounded
+queue and flushes at shutdown; collector failures do not block API readiness.
+Delivery is best effort: unavailable collectors or a full queue can lose exports,
+while console logs remain available. This exports logs, not distributed traces
+or metrics. See [collector setup and limits](docs/observability.md).
 
 ### Authentication
 

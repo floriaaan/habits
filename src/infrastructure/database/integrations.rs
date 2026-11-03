@@ -62,10 +62,12 @@ async fn purge_entries(
 }
 
 impl Store {
+    #[tracing::instrument(skip_all, fields(operation = "integration_info"), err)]
     pub async fn integration_info(
         &self,
         actor: &Principal,
     ) -> Result<Vec<IntegrationInfo>, DomainError> {
+        tracing::info!("integration info started");
         actor.require(Scope::IntegrationsManage)?;
         let rows = sqlx::query(
             "SELECT id, provider, revoked_at FROM integrations WHERE user_id = ? ORDER BY provider",
@@ -104,6 +106,7 @@ impl Store {
             .parse()
             .map_err(persistence)
     }
+    #[tracing::instrument(skip_all, fields(operation = "connect_integration"), err)]
     pub async fn connect_integration(
         &self,
         user: UserId,
@@ -113,6 +116,7 @@ impl Store {
         cipher: &SecretCipher,
         capacity: u32,
     ) -> Result<Uuid, DomainError> {
+        tracing::info!("connect integration started");
         let encrypted = cipher.encrypt(
             user,
             provider,
@@ -200,7 +204,9 @@ impl Store {
         }
         Ok(())
     }
+    #[tracing::instrument(skip_all, fields(operation = "disconnect_integration"), err)]
     pub async fn disconnect_integration(&self, user: UserId, id: Uuid) -> Result<(), DomainError> {
+        tracing::info!("disconnect integration started");
         self.disconnect_integration_at_revision(user, id, None)
             .await
     }
@@ -268,7 +274,9 @@ impl Store {
         tx.commit().await.map_err(persistence)?;
         Ok(())
     }
+    #[tracing::instrument(skip_all, fields(operation = "oauth_state"), err)]
     pub async fn oauth_state(&self, actor: &Principal) -> Result<String, DomainError> {
+        tracing::info!("oauth state started");
         actor.require(Scope::IntegrationsManage)?;
         let state = opaque_token()?;
         let now = Utc::now();
@@ -294,7 +302,9 @@ impl Store {
         tx.commit().await.map_err(persistence)?;
         Ok(state)
     }
+    #[tracing::instrument(skip_all, fields(operation = "consume_oauth_state"), err)]
     pub async fn consume_oauth_state(&self, state: &str) -> Result<UserId, DomainError> {
+        tracing::info!("consume oauth state started");
         if state.len() != 46 {
             return Err(DomainError::Unauthenticated);
         }
@@ -312,11 +322,13 @@ impl Store {
                 .map_err(persistence)?,
         ))
     }
+    #[tracing::instrument(skip_all, fields(operation = "set_strava_mapping"), err)]
     pub async fn set_strava_mapping(
         &self,
         actor: &Principal,
         mapping: Mapping,
     ) -> Result<(), DomainError> {
+        tracing::info!("set strava mapping started");
         actor.require(Scope::IntegrationsManage)?;
         actor.require(Scope::HabitsWrite)?;
         let id = self.integration_id(actor.user_id, "strava").await?;
@@ -343,6 +355,7 @@ impl Store {
             id.parse().map_err(persistence)?,
         ))
     }
+    #[tracing::instrument(skip_all, fields(operation = "purge_source"), err)]
     pub async fn purge_source(
         &self,
         user: UserId,
@@ -350,6 +363,7 @@ impl Store {
         object: i64,
         cause: Uuid,
     ) -> Result<(), DomainError> {
+        tracing::info!("purge source started");
         self.purge_source_inner(user, integration, object, cause, None)
             .await
     }
@@ -383,6 +397,7 @@ impl Store {
         tx.commit().await.map_err(persistence)?;
         Ok(())
     }
+    #[tracing::instrument(skip_all, fields(operation = "reconcile_activity"), err)]
     pub async fn reconcile_activity(
         &self,
         user: UserId,
@@ -390,14 +405,17 @@ impl Store {
         activity: &Activity,
         cause: Uuid,
     ) -> Result<(), DomainError> {
+        tracing::info!("reconcile activity started");
         self.reconcile_inner(user, integration, activity, cause, None)
             .await
     }
+    #[tracing::instrument(skip_all, fields(operation = "reconcile_job_activity"), err)]
     pub async fn reconcile_job_activity(
         &self,
         job: &crate::infrastructure::jobs::LeasedJob,
         activity: &Activity,
     ) -> Result<(), DomainError> {
+        tracing::info!("reconcile job activity started");
         self.reconcile_inner(job.user_id, job.integration_id, activity, job.id, Some(job))
             .await
     }
@@ -634,11 +652,13 @@ impl Store {
         }
         Ok(())
     }
+    #[tracing::instrument(skip_all, fields(operation = "job_status"), err)]
     pub async fn job_status(
         &self,
         actor: &Principal,
         id: Uuid,
     ) -> Result<serde_json::Value, DomainError> {
+        tracing::info!("job status started");
         actor.require(Scope::IntegrationsManage)?;
         let row = sqlx::query(
             "SELECT state, attempts, available_at FROM jobs WHERE user_id = ? AND id = ?",

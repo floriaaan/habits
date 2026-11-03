@@ -200,22 +200,26 @@ pub trait HabitRepository: Send + Sync {
     ) -> impl Future<Output = Result<Vec<Habit>, DomainError>> + Send;
 }
 
+#[tracing::instrument(skip_all, fields(operation = "create"), err)]
 pub async fn create(
     repo: &impl HabitRepository,
     actor: &Principal,
     mut input: NewHabit,
 ) -> Result<Habit, DomainError> {
+    tracing::info!("create started");
     actor.require(Scope::HabitsWrite)?;
     input.name = input.name.trim().to_owned();
     input.validate()?;
     repo.create(actor.user_id, input).await
 }
 
+#[tracing::instrument(skip_all, fields(operation = "list"), err)]
 pub async fn list(
     repo: &impl HabitRepository,
     actor: &Principal,
     page: Pagination,
 ) -> Result<HabitPage, DomainError> {
+    tracing::info!("list started");
     actor.require(Scope::HabitsRead)?;
     let page = page.validate()?;
     Ok(HabitPage {

@@ -101,6 +101,7 @@ class HomeAssistantEndToEnd(unittest.IsolatedAsyncioTestCase):
         self.addCleanup(resolver_patch.stop)
         self.assertTrue(await async_setup_component(self.hass, "homeassistant", self.hass_config))
         self.assertTrue(await async_setup_component(self.hass, "frontend", self.hass_config))
+        self.assertTrue(await async_setup_component(self.hass, "brands", self.hass_config))
         await self.hass.async_start()
         self.addAsyncCleanup(self.hass.async_stop)
 
@@ -235,6 +236,7 @@ class HomeAssistantEndToEnd(unittest.IsolatedAsyncioTestCase):
         dashboards = [s for s in self.hass.states.async_all("sensor") if "groups" in s.attributes]
         self.assertEqual(len(dashboards), 1)
         dashboard_id = dashboards[0].entity_id
+        self.assertEqual(dashboard_id, "sensor.habits_" + entry.runtime_data.data["user_id"].replace("-", "_"))
         switches = self.hass.states.async_all("switch")
         buttons = self.hass.states.async_all("button")
         self.assertEqual(len(switches), 1)
@@ -269,6 +271,16 @@ class HomeAssistantEndToEnd(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(old_task.done())
         self.assertEqual(entry.state, ConfigEntryState.LOADED)
         await self.assert_bundled_card()
+        # Reload must retain a user-customized dashboard ID and its stable registry identity.
+        from homeassistant.helpers import entity_registry as er
+        registry = er.async_get(self.hass)
+        registered = registry.async_get(dashboard_id)
+        unique_id = registered.unique_id
+        registry.async_update_entity(dashboard_id, new_entity_id="sensor.my_habits")
+        self.assertTrue(await self.hass.config_entries.async_reload(entry.entry_id))
+        await self.hass.async_block_till_done()
+        self.assertEqual(registry.async_get("sensor.my_habits").unique_id, unique_id)
+        self.assertIsNotNone(self.hass.states.get("sensor.my_habits"))
         task = entry.runtime_data.stream_task
         self.assertTrue(await self.hass.config_entries.async_unload(entry.entry_id))
         self.assertTrue(task.done())
@@ -285,10 +297,15 @@ class HomeAssistantEndToEnd(unittest.IsolatedAsyncioTestCase):
             await websocket.send_json({"id": 1, "type": "lovelace/resources/list"})
             result = await websocket.receive_json()
             self.assertTrue(result["success"])
+        for icon in ("icon.png", "icon@2x.png"):
+            async with self.session.get(f"http://127.0.0.1:{self.ha_port}/api/brands/integration/habit_tracker/{icon}",
+                                        headers={"Authorization": f"Bearer {access}"}) as response:
+                self.assertEqual(response.status, 200)
+                self.assertEqual(await response.read(), (CLIENT_ROOT / "custom_components/habit_tracker/brand" / icon).read_bytes())
         items = [item for item in result["result"] if item["url"].startswith("/habit_tracker/frontend/")]
         self.assertEqual([item["type"] for item in items], ["module"])
         cards = [item["url"] for item in items]
-        self.assertEqual(cards, ["/habit_tracker/frontend/0.2.0/habit-tracker-card.js"])
+        self.assertEqual(cards, ["/habit_tracker/frontend/0.3.0/habit-tracker-card.js"])
         self.assertFalse(any(url.startswith("/habit_tracker/frontend/")
                              for url in self.hass.data[DATA_EXTRA_MODULE_URL].urls))
         # Only a static, credential-free module is publicly served; no directory exposure.
@@ -298,7 +315,7 @@ class HomeAssistantEndToEnd(unittest.IsolatedAsyncioTestCase):
             self.assertIn('customElements.define("habit-tracker-card"', card)
             self.assertNotIn(self.token, card)
             self.assertEqual(card, (CLIENT_ROOT / "custom_components/habit_tracker/www/habit-tracker-card.js").read_text())
-        async with self.session.get(f"http://127.0.0.1:{self.ha_port}/habit_tracker/frontend/0.2.0/manifest.json") as response:
+        async with self.session.get(f"http://127.0.0.1:{self.ha_port}/habit_tracker/frontend/0.3.0/manifest.json") as response:
             self.assertEqual(response.status, 404)
 
     async def test_card_resource_upgrades_without_touching_other_resources(self):
@@ -315,7 +332,7 @@ class HomeAssistantEndToEnd(unittest.IsolatedAsyncioTestCase):
         items = {item["id"]: item for item in resources.async_items()}
         self.assertEqual(len(items), 2)
         self.assertEqual(items[foreign["id"]], foreign)
-        self.assertEqual(items[previous["id"]]["url"], "/habit_tracker/frontend/0.2.0/habit-tracker-card.js")
+        self.assertEqual(items[previous["id"]]["url"], "/habit_tracker/frontend/0.3.0/habit-tracker-card.js")
         self.assertEqual(items[previous["id"]]["type"], "module")
         self.assertNotIn(duplicate["id"], items)
         self.assertTrue(await self.hass.config_entries.async_reload(result["result"].entry_id))
@@ -335,10 +352,10 @@ class HomeAssistantEndToEnd(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["result"].state, ConfigEntryState.LOADED)
         self.assertIs(lovelace.resources, resources)
         self.assertEqual(resources.async_items(), declared)
-        self.assertTrue(any("/habit_tracker/frontend/0.2.0/habit-tracker-card.js" in line for line in logs.output))
+        self.assertTrue(any("/habit_tracker/frontend/0.3.0/habit-tracker-card.js" in line for line in logs.output))
         self.assertFalse(any(url.startswith("/habit_tracker/frontend/")
                              for url in self.hass.data[DATA_EXTRA_MODULE_URL].urls))
-        async with self.session.get(f"http://127.0.0.1:{self.ha_port}/habit_tracker/frontend/0.2.0/habit-tracker-card.js") as response:
+        async with self.session.get(f"http://127.0.0.1:{self.ha_port}/habit_tracker/frontend/0.3.0/habit-tracker-card.js") as response:
             self.assertEqual(response.status, 200)
 
     async def test_transport_retry_reuses_key_and_redirect_never_receives_token(self):

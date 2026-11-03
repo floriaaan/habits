@@ -235,6 +235,7 @@ impl Store {
         })
     }
 
+    #[tracing::instrument(skip_all, fields(operation = "create_user"), err)]
     pub async fn create_user(
         &self,
         issuer: &str,
@@ -242,6 +243,7 @@ impl Store {
         timezone: &str,
         admin: bool,
     ) -> Result<UserId, DomainError> {
+        tracing::info!("create user started");
         if issuer.is_empty()
             || issuer.len() > 2048
             || subject.is_empty()
@@ -289,11 +291,13 @@ impl Store {
     }
 
     /// Local CLI only. HTTP must use create_token, which prevents scope escalation.
+    #[tracing::instrument(skip_all, fields(operation = "issue_local_token"), err)]
     pub async fn issue_local_token(
         &self,
         user: UserId,
         input: NewToken,
     ) -> Result<IssuedToken, DomainError> {
+        tracing::info!("issue local token started");
         let mut tx = self
             .pool
             .begin_with("BEGIN IMMEDIATE")
@@ -303,11 +307,13 @@ impl Store {
         tx.commit().await.map_err(persistence)?;
         Ok(token)
     }
+    #[tracing::instrument(skip_all, fields(operation = "create_token"), err)]
     pub async fn create_token(
         &self,
         actor: &Principal,
         input: NewToken,
     ) -> Result<IssuedToken, DomainError> {
+        tracing::info!("create token started");
         input.authorize(actor)?;
         // A service account may use its token but cannot mint personal identities.
         if actor.mode == IdentityMode::ServiceAccount {
@@ -315,17 +321,21 @@ impl Store {
         }
         self.issue_local_token(actor.user_id, input).await
     }
+    #[tracing::instrument(skip_all, fields(operation = "list_tokens"), err)]
     pub async fn list_tokens(
         &self,
         actor: &Principal,
         page: Pagination,
     ) -> Result<Vec<TokenMetadata>, DomainError> {
+        tracing::info!("list tokens started");
         actor.require(Scope::TokensManage)?;
         let page = page.validate()?;
         let rows = sqlx::query("SELECT * FROM access_tokens WHERE user_id = ? ORDER BY created_at, id LIMIT ? OFFSET ?").bind(actor.user_id.0.to_string()).bind(page.limit).bind(page.offset).fetch_all(&self.pool).await.map_err(persistence)?;
         rows.iter().map(metadata).collect()
     }
+    #[tracing::instrument(skip_all, fields(operation = "revoke_token"), err)]
     pub async fn revoke_token(&self, actor: &Principal, id: Uuid) -> Result<(), DomainError> {
+        tracing::info!("revoke token started");
         actor.require(Scope::TokensManage)?;
         let mut tx = self
             .pool
@@ -356,11 +366,13 @@ impl Store {
         tx.commit().await.map_err(persistence)?;
         Ok(())
     }
+    #[tracing::instrument(skip_all, fields(operation = "rotate_token"), err)]
     pub async fn rotate_token(
         &self,
         actor: &Principal,
         id: Uuid,
     ) -> Result<IssuedToken, DomainError> {
+        tracing::info!("rotate token started");
         actor.require(Scope::TokensManage)?;
         if actor.mode == IdentityMode::ServiceAccount {
             return Err(DomainError::Forbidden);
@@ -404,11 +416,13 @@ impl Store {
         tx.commit().await.map_err(persistence)?;
         Ok(token)
     }
+    #[tracing::instrument(skip_all, fields(operation = "create_service_account"), err)]
     pub async fn create_service_account(
         &self,
         actor: &Principal,
         input: NewServiceAccount,
     ) -> Result<ServiceAccount, DomainError> {
+        tracing::info!("create service account started");
         actor.require(Scope::TokensManage)?;
         input.validate()?;
         if actor.mode == IdentityMode::ServiceAccount {
@@ -445,11 +459,13 @@ impl Store {
         tx.commit().await.map_err(persistence)?;
         Ok(account)
     }
+    #[tracing::instrument(skip_all, fields(operation = "revoke_service_account"), err)]
     pub async fn revoke_service_account(
         &self,
         actor: &Principal,
         id: Uuid,
     ) -> Result<(), DomainError> {
+        tracing::info!("revoke service account started");
         actor.require(Scope::TokensManage)?;
         if actor.mode == IdentityMode::ServiceAccount {
             return Err(DomainError::Forbidden);

@@ -9,6 +9,7 @@ use chrono::{DateTime, Utc};
 use reqwest::Url;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use std::{sync::Arc, time::Duration};
+use tracing::Instrument;
 use zeroize::Zeroize;
 
 pub struct StravaConfig {
@@ -442,11 +443,19 @@ impl IntegrationRuntime {
             }
             match self.store.claim_job().await {
                 Ok(Some(job)) => {
-                    let result = self.execute(&job).await;
+                    let result = async {
+                        tracing::info!(attempt=job.attempts, "integration job started");
+                        self.execute(&job).await
+                    }.instrument(tracing::info_span!("integration.job", job_id=%job.id, user_id=%job.user_id.0, operation=%job.kind)).await;
                     let (success, retry, permanent) = match result {
                         Ok(()) => (true, None, false),
                         Err(failure) => (false, failure.retry_after, failure.permanent),
                     };
+                    if success {
+                        tracing::info!(job_id=%job.id, "integration job succeeded");
+                    } else {
+                        tracing::warn!(job_id=%job.id, permanent, retry_at=?retry, "integration job failed; retry policy evaluated");
+                    }
                     if self
                         .store
                         .finish_job(&job, success, retry, permanent)

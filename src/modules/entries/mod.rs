@@ -125,6 +125,7 @@ pub trait EntryRepository: Send + Sync {
     ) -> impl Future<Output = Result<Vec<Entry>, DomainError>> + Send;
 }
 
+#[tracing::instrument(skip_all, fields(operation = "record"), err)]
 pub async fn record(
     repo: &impl EntryRepository,
     actor: &Principal,
@@ -133,6 +134,7 @@ pub async fn record(
     input: NewEntry,
     now: DateTime<Utc>,
 ) -> Result<RecordedEntry, DomainError> {
+    tracing::info!("record started");
     actor.require(Scope::EntriesWrite)?;
     if key.is_empty() || key.len() > 128 || !key.bytes().all(|c| c.is_ascii_graphic()) {
         return Err(DomainError::Validation(
@@ -143,21 +145,25 @@ pub async fn record(
     repo.record(actor.user_id, habit, key, input).await
 }
 
+#[tracing::instrument(skip_all, fields(operation = "get"), err)]
 pub async fn get(
     repo: &impl EntryRepository,
     actor: &Principal,
     id: Uuid,
 ) -> Result<Entry, DomainError> {
+    tracing::info!("get started");
     actor.require(Scope::EntriesRead)?;
     repo.get(actor.user_id, id).await
 }
 
+#[tracing::instrument(skip_all, fields(operation = "list"), err)]
 pub async fn list(
     repo: &impl EntryRepository,
     actor: &Principal,
     habit: Uuid,
     page: Pagination,
 ) -> Result<EntryPage, DomainError> {
+    tracing::info!("list started");
     actor.require(Scope::EntriesRead)?;
     let page = page.validate()?;
     Ok(EntryPage {

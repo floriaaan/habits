@@ -143,6 +143,7 @@ impl Principal {
         if self.scopes.contains(&scope) {
             Ok(())
         } else {
+            tracing::warn!(required_scope=?scope, "authorization denied: required scope missing");
             Err(DomainError::Forbidden)
         }
     }

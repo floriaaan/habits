@@ -27,6 +27,8 @@ class HacsPackageTest(unittest.TestCase):
                 self.assertIn(prefix + "www/habit-tracker-card.js", names)
                 self.assertIn(prefix + "www/dashboard.yaml", names)
                 self.assertIn(prefix + "translations/fr.json", names)
+                self.assertIn(prefix + "brand/icon.png", names)
+                self.assertIn(prefix + "brand/icon@2x.png", names)
                 self.assertIn("README.fr.md", names)
                 self.assertIn(b"README.fr.md", archive.read("README.md"))
                 self.assertIn(b"README.md", archive.read("README.fr.md"))

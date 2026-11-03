@@ -155,10 +155,12 @@ pub(super) async fn rebuild(
 }
 
 impl Store {
+    #[tracing::instrument(skip_all, fields(operation = "gamification"), err)]
     pub async fn gamification(
         &self,
         actor: &Principal,
     ) -> Result<crate::modules::gamification::Gamification, DomainError> {
+        tracing::info!("gamification started");
         actor.require(Scope::StatisticsRead)?;
         let xp: i64 =
             sqlx::query_scalar("SELECT COALESCE(SUM(amount),0) FROM xp_ledger WHERE user_id = ?")
@@ -168,11 +170,13 @@ impl Store {
                 .map_err(persistence)?;
         Ok(crate::modules::gamification::summary(xp))
     }
+    #[tracing::instrument(skip_all, fields(operation = "ledger"), err)]
     pub async fn ledger(
         &self,
         actor: &Principal,
         page: Pagination,
     ) -> Result<crate::modules::gamification::LedgerPage, DomainError> {
+        tracing::info!("ledger started");
         actor.require(Scope::StatisticsRead)?;
         let page = page.validate()?;
         let rows = sqlx::query(
@@ -210,12 +214,14 @@ impl Store {
             offset: page.offset,
         })
     }
+    #[tracing::instrument(skip_all, fields(operation = "versions"), err)]
     pub async fn versions(
         &self,
         actor: &Principal,
         id: Uuid,
         page: Pagination,
     ) -> Result<Vec<HabitVersion>, DomainError> {
+        tracing::info!("versions started");
         actor.require(Scope::HabitsRead)?;
         let page = page.validate()?;
         let mut tx = self.pool.begin().await.map_err(persistence)?;
@@ -232,17 +238,21 @@ impl Store {
         tx.commit().await.map_err(persistence)?;
         Ok(versions)
     }
+    #[tracing::instrument(skip_all, fields(operation = "get_habit"), err)]
     pub async fn get_habit(&self, actor: &Principal, id: Uuid) -> Result<Habit, DomainError> {
+        tracing::info!("get habit started");
         actor.require(Scope::HabitsRead)?;
         let mut c = self.pool.acquire().await.map_err(persistence)?;
         owned_habit(&mut c, actor.user_id, id).await
     }
+    #[tracing::instrument(skip_all, fields(operation = "update_habit"), err)]
     pub async fn update_habit(
         &self,
         actor: &Principal,
         id: Uuid,
         input: UpdateHabit,
     ) -> Result<HabitVersion, DomainError> {
+        tracing::info!("update habit started");
         actor.require(Scope::HabitsWrite)?;
         let mut tx = self
             .pool
@@ -280,7 +290,9 @@ impl Store {
             definition: input.definition,
         })
     }
+    #[tracing::instrument(skip_all, fields(operation = "archive_habit"), err)]
     pub async fn archive_habit(&self, actor: &Principal, id: Uuid) -> Result<(), DomainError> {
+        tracing::info!("archive habit started");
         actor.require(Scope::HabitsWrite)?;
         let mut tx = self
             .pool
@@ -300,11 +312,13 @@ impl Store {
         tx.commit().await.map_err(persistence)?;
         Ok(())
     }
+    #[tracing::instrument(skip_all, fields(operation = "statistics"), err)]
     pub async fn statistics(
         &self,
         actor: &Principal,
         id: Uuid,
     ) -> Result<HabitStatistics, DomainError> {
+        tracing::info!("statistics started");
         actor.require(Scope::StatisticsRead)?;
         let mut tx = self.pool.begin().await.map_err(persistence)?;
         let (_, versions, entries, rests, from, today) = data(&mut tx, actor.user_id, id).await?;
@@ -320,7 +334,9 @@ impl Store {
         tx.commit().await.map_err(persistence)?;
         Ok(statistics::summarize(periods, heatmap, today, xp))
     }
+    #[tracing::instrument(skip_all, fields(operation = "recalculate"), err)]
     pub async fn recalculate(&self, actor: &Principal, id: Uuid) -> Result<(), DomainError> {
+        tracing::info!("recalculate started");
         actor.require(Scope::HabitsWrite)?;
         let mut tx = self
             .pool
@@ -341,6 +357,7 @@ impl Store {
         tx.commit().await.map_err(persistence)?;
         Ok(())
     }
+    #[tracing::instrument(skip_all, fields(operation = "set_rest"), err)]
     pub async fn set_rest(
         &self,
         actor: &Principal,
@@ -348,6 +365,7 @@ impl Store {
         date: NaiveDate,
         rest: bool,
     ) -> Result<(), DomainError> {
+        tracing::info!("set rest started");
         actor.require(Scope::HabitsWrite)?;
         let mut tx = self
             .pool
@@ -373,12 +391,14 @@ impl Store {
         tx.commit().await.map_err(persistence)?;
         Ok(())
     }
+    #[tracing::instrument(skip_all, fields(operation = "rests"), err)]
     pub async fn rests(
         &self,
         actor: &Principal,
         id: Uuid,
         page: Pagination,
     ) -> Result<Vec<RestException>, DomainError> {
+        tracing::info!("rests started");
         actor.require(Scope::HabitsRead)?;
         let page = page.validate()?;
         let mut tx = self.pool.begin().await.map_err(persistence)?;
@@ -397,6 +417,7 @@ impl Store {
         tx.commit().await.map_err(persistence)?;
         Ok(results)
     }
+    #[tracing::instrument(skip_all, fields(operation = "change_entry"), err)]
     pub async fn change_entry(
         &self,
         actor: &Principal,
@@ -404,6 +425,7 @@ impl Store {
         key: &str,
         input: Option<NewEntry>,
     ) -> Result<Entry, DomainError> {
+        tracing::info!("change entry started");
         actor.require(Scope::EntriesWrite)?;
         validate_key(key)?;
         if let Some(input) = &input {

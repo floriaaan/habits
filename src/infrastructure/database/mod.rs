@@ -32,6 +32,7 @@ pub struct Store {
 }
 
 impl Store {
+    #[tracing::instrument(skip_all)]
     pub async fn connect(url: &str) -> Result<Self, sqlx::Error> {
         let options = SqliteConnectOptions::from_str(url)?
             .create_if_missing(true)
@@ -48,6 +49,7 @@ impl Store {
             .run(&pool)
             .await
             .map_err(|error| sqlx::Error::Migrate(Box::new(error)))?;
+        tracing::info!("SQLite connected and migrations applied");
         Ok(Self {
             pool,
             streams: std::sync::Arc::new(tokio::sync::Semaphore::new(16)),
@@ -60,7 +62,9 @@ impl Store {
 
     /// SQLite produces a coherent snapshot including committed WAL pages.
     /// The destination must not exist; SQLite refuses to overwrite it.
+    #[tracing::instrument(skip_all)]
     pub async fn backup(&self, destination: &Path) -> Result<(), sqlx::Error> {
+        tracing::info!("SQLite backup started");
         if destination.exists() {
             return Err(sqlx::Error::Protocol(
                 "backup destination already exists".into(),
@@ -170,6 +174,7 @@ async fn insert_habit(
         .map_err(persistence)?;
     sqlx::query("INSERT INTO habit_versions (id, user_id, habit_id, effective_from, definition, created_at) VALUES (?, ?, ?, '1970-01-01', ?, ?)")
             .bind(habit.id.to_string()).bind(user.0.to_string()).bind(habit.id.to_string()).bind(serde_json::to_string(&habit.definition).map_err(persistence)?).bind(habit.created_at).execute(&mut **tx).await.map_err(persistence)?;
+    tracing::info!(habit_id=%habit.id, "habit created in transaction");
     Ok(habit)
 }
 

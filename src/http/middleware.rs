@@ -1,4 +1,5 @@
 use crate::modules::DomainError;
+use axum::extract::MatchedPath;
 use axum::{
     Json,
     extract::{Request, State},
@@ -11,6 +12,7 @@ use std::{
     sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
+use tracing::Instrument;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
@@ -107,6 +109,11 @@ impl From<DomainError> for ApiError {
 }
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
+        if self.status.is_server_error() {
+            tracing::error!(error_code=%self.detail.code, status=self.status.as_u16(), "request failed");
+        } else {
+            tracing::warn!(error_code=%self.detail.code, status=self.status.as_u16(), "request rejected");
+        }
         let mut response = self.status.into_response();
         response.extensions_mut().insert(self.detail);
         if self.status == StatusCode::UNAUTHORIZED {
@@ -166,6 +173,8 @@ pub async fn authenticate(
     }
     match identity {
         Ok(actor) => {
+            tracing::Span::current().record("user_id", actor.user_id.0.to_string());
+            tracing::debug!(identity_mode=?actor.mode, "authentication accepted");
             request.extensions_mut().insert(actor);
             next.run(request).await
         }
@@ -180,7 +189,16 @@ pub async fn boundary(
 ) -> Response {
     let id = Uuid::new_v4().to_string();
     let method = request.method().to_string();
+    let route = request
+        .extensions()
+        .get::<MatchedPath>()
+        .map(|p| p.as_str())
+        .unwrap_or("unmatched")
+        .to_owned();
+    let span = tracing::info_span!("http.request", request_id=%id, %method, %route, user_id=tracing::field::Empty);
+    async move {
     let started = Instant::now();
+    tracing::info!("request started");
     let mut response = match budget.admit() {
         Err(error) => error.into_response(),
         Ok(()) => match tokio::time::timeout(Duration::from_secs(10), next.run(request)).await {
@@ -218,6 +236,7 @@ pub async fn boundary(
         .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
     tracing::info!(request_id = %id, %method, status = status.as_u16(), elapsed_ms = started.elapsed().as_millis(), "request completed");
     response
+    }.instrument(span).await
 }
 
 #[derive(Clone)]

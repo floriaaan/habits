@@ -20,7 +20,6 @@ use axum::{
 use chrono::Utc;
 use serde::Serialize;
 use tower::limit::ConcurrencyLimitLayer;
-use tower_http::trace::TraceLayer;
 use utoipa::{
     Modify, OpenApi, ToSchema,
     openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme},
@@ -95,10 +94,6 @@ fn assemble(
         .with_state(store)
         .layer(DefaultBodyLimit::max(16 * 1024))
         .layer(ConcurrencyLimitLayer::new(64))
-        .layer(
-            TraceLayer::new_for_http()
-                .make_span_with(|_: &axum::http::Request<_>| tracing::info_span!("http")),
-        )
         .layer(middleware::from_fn_with_state(
             TrafficBudget::default(),
             boundary,

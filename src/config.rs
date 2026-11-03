@@ -10,6 +10,8 @@ pub struct Config {
     pub log_filter: String,
     pub auth_mode: AuthMode,
     pub oidc: Option<OidcSettings>,
+    pub logs_endpoint: Option<String>,
+    pub service_name: String,
 }
 
 #[derive(Clone)]
@@ -118,7 +120,32 @@ impl Config {
             }
             None
         };
+        let logs_endpoint = get("OTEL_EXPORTER_OTLP_LOGS_ENDPOINT").filter(|v| !v.is_empty());
+        if let Some(endpoint) = &logs_endpoint {
+            let url = reqwest::Url::parse(endpoint)
+                .map_err(|_| ConfigError("invalid OTLP logs endpoint"))?;
+            if !matches!(url.scheme(), "http" | "https")
+                || url.host_str().is_none()
+                || !url.username().is_empty()
+                || url.password().is_some()
+                || url.query().is_some()
+                || url.fragment().is_some()
+                || !url.path().ends_with("/v1/logs")
+            {
+                return Err(ConfigError(
+                    "OTLP endpoint must be HTTP(S), end in /v1/logs, and contain no credentials, query or fragment",
+                ));
+            }
+        }
+        let service_name = get("OTEL_SERVICE_NAME")
+            .filter(|v| !v.is_empty())
+            .unwrap_or_else(|| "habit-tracker".into());
+        if service_name.len() > 128 || service_name.chars().any(char::is_control) {
+            return Err(ConfigError("invalid OTEL_SERVICE_NAME"));
+        }
         Ok(Self {
+            logs_endpoint,
+            service_name,
             auth_mode,
             oidc,
             listen_addr,
@@ -173,6 +200,16 @@ mod tests {
             ("AUTH_MODE", "test"),
             ("AUTH_MODE", "oidc"),
             ("OIDC_AUDIENCE", "unconfirmed"),
+            ("OTEL_EXPORTER_OTLP_LOGS_ENDPOINT", "http://collector:4318"),
+            (
+                "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT",
+                "https://user:secret@collector/v1/logs",
+            ),
+            (
+                "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT",
+                "https://collector/v1/logs?token=secret",
+            ),
+            ("OTEL_SERVICE_NAME", "bad\nname"),
         ] {
             assert!(
                 Config::from_lookup(|name| (name == key).then(|| value.into())).is_err(),
