@@ -369,3 +369,43 @@ fournisseur externe. Aucun secret réel ni Home Assistant personnel n'est utilis
   publiée avec `habit_tracker.zip`, vérifié identique aux fichiers du composant
   verrouillé dans le sous-module. Syntaxe JS, liens EN/FR et `git diff --check`
   vérifiés. Aucun accès/modification au Home Assistant personnel de l'opérateur.
+
+
+## Onboarding HA et éditeur Lovelace — 2026-11-03
+
+- Backend `f8d489d`, client public `7548ed3`, version **0.2.0**.
+  Migration additive `0007_habit_setup.sql` ; aucun historique existant modifié.
+- **67 tests Rust réussis**, fmt, Clippy avec warnings refusés, build release
+  macOS arm64, frontières du domaine et OpenAPI identique au snapshot : succès.
+  Nouveaux cas : accès sans token/scopes insuffisants, fuseau invalide, rejeu
+  concurrent, même clé entre tenants, conflit de contenu et rollback complet si
+  l'écriture du reçu échoue.
+- **7 tests HA réussis sur Linux**, avec le vrai HA 2026.10.2 et le binaire Rust :
+  sept presets, création libre, validation, refresh/entités, réponse perdue après
+  commit et reprise avec la même clé, refus sans `habits:write`, remplacement du
+  token du même compte et reprise du formulaire. Les anciens parcours actions,
+  SSE, reauth et ressources Lovelace restent couverts.
+- [CI backend](https://github.com/floriaaan/habits/actions/runs/41709882759) :
+  Rust, HA, audit/deny et smoke Docker natifs AMD64/ARM64 réussis. Publication
+  GHCR réussie : `ghcr.io/floriaaan/habits:latest` et
+  `sha-f8d489df40f22d50631f34a1890e772e3ad53a58`, manifeste
+  `sha256:df4de575f98e146fe83b1d19c96c41c6aedaa5a51fd2ea7e2794af21d0c16ce1`.
+- [Release HACS v0.2.0](https://github.com/floriaaan/habit-tracker-ha/releases/tag/v0.2.0)
+  publiée avec `habit_tracker.zip`, SHA-256
+  `d6b25606fe5b89111bed15819b2170592b256b21dd3524886b2f15756188a3ee`.
+- [HACS et Hassfest](https://github.com/floriaaan/habit-tracker-ha/actions/runs/41709843879),
+  [export et tests des archives](https://github.com/floriaaan/habits/actions/runs/41709882727) : succès.
+  Les 17 fichiers de `habit_tracker.zip` ont été comparés octet par octet au
+  composant committé. Syntaxe JS, détection UI et `git diff --check` : succès.
+- Chrome headless sur HA temporaire en loopback : ouverture de **Configurer**,
+  choix de preset, formulaire prérempli, modification du nom et création réelle.
+  Éditeur monté avec le vrai contexte et le vrai `ha-form` HA : capteur proposé
+  par `getStubConfig`, changement de vue par le sélecteur, événement
+  `config-changed`, conservation de `grid_options` et retrait du filtre de
+  catégorie hors de la vue Habitudes. Captures en 1366×900 et 390×844 ; aucun
+  débordement horizontal dans l'éditeur. Cette vérification n'est pas un test
+  du homelab personnel ni un test automatisé du sélecteur de cartes Lovelace.
+- Les deux nouveaux tests HA exécutés seuls sur macOS sortent avec code 0.
+  La suite complète locale conserve le crash Python 3.14.3 en finalisation/GC
+  déjà décrit ci-dessus ; la preuve de réussite complète provient du runner Linux.
+  Aucun serveur HA personnel, secret opérateur ou fournisseur externe utilisé.

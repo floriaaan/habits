@@ -242,7 +242,7 @@ Pour sélectionner la dernière version publiée sur la branche du client,
 `git submodule update --remote integrations/home-assistant/habit-tracker-ha`,
 puis tester et committer le pointeur. Pour un nouveau clone :
 `git clone --recurse-submodules https://github.com/floriaaan/habits.git`.
-La commande exige toujours l'accès au dépôt privé du backend.
+La commande récupère le backend et son sous-module public.
 
 ```sh
 cargo build --locked
