@@ -22,6 +22,8 @@ from homeassistant.config_entries import ConfigEntries, ConfigEntryState
 from homeassistant import loader
 from homeassistant.auth import auth_manager_from_config
 from homeassistant.components.frontend import DATA_EXTRA_MODULE_URL
+from homeassistant.components.lovelace.const import LOVELACE_DATA
+from homeassistant.components.lovelace.resources import ResourceYAMLCollection
 from homeassistant.setup import async_setup_component
 from homeassistant.bootstrap import async_load_base_functionality
 
@@ -40,7 +42,9 @@ class LoopbackResolver(aiohttp.ThreadedResolver):
 class HomeAssistantEndToEnd(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.directory = tempfile.TemporaryDirectory(prefix="habit-tracker-ha-test-")
-        self.addCleanup(self.directory.cleanup)
+        # Python caches imported integration modules across the HA instances.
+        # Keep their ZIP installation paths valid until every test has stopped.
+        self.addClassCleanup(self.directory.cleanup)
         self.path = Path(self.directory.name)
         self.binary = str(Path(os.environ["HABIT_TRACKER_BIN"]).resolve())
         with socket.socket() as sock:
@@ -185,9 +189,23 @@ class HomeAssistantEndToEnd(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(task.done())
 
     async def assert_bundled_card(self):
-        modules = self.hass.data[DATA_EXTRA_MODULE_URL].urls
-        cards = [url for url in modules if url.startswith("/habit_tracker/frontend/")]
-        self.assertEqual(cards, ["/habit_tracker/frontend/0.1.1/habit-tracker-card.js"])
+        # Read the same authenticated WebSocket resource list as the HA frontend.
+        viewer = await self.hass.auth.async_create_system_user("Isolated card test")
+        refresh = await self.hass.auth.async_create_refresh_token(viewer)
+        access = self.hass.auth.async_create_access_token(refresh)
+        async with self.session.ws_connect(f"http://127.0.0.1:{self.ha_port}/api/websocket") as websocket:
+            self.assertEqual((await websocket.receive_json())["type"], "auth_required")
+            await websocket.send_json({"type": "auth", "access_token": access})
+            self.assertEqual((await websocket.receive_json())["type"], "auth_ok")
+            await websocket.send_json({"id": 1, "type": "lovelace/resources/list"})
+            result = await websocket.receive_json()
+            self.assertTrue(result["success"])
+        items = [item for item in result["result"] if item["url"].startswith("/habit_tracker/frontend/")]
+        self.assertEqual([item["type"] for item in items], ["module"])
+        cards = [item["url"] for item in items]
+        self.assertEqual(cards, ["/habit_tracker/frontend/0.1.2/habit-tracker-card.js"])
+        self.assertFalse(any(url.startswith("/habit_tracker/frontend/")
+                             for url in self.hass.data[DATA_EXTRA_MODULE_URL].urls))
         # Only a static, credential-free module is publicly served; no directory exposure.
         async with self.session.get(f"http://127.0.0.1:{self.ha_port}" + cards[0]) as response:
             self.assertEqual(response.status, 200)
@@ -195,8 +213,48 @@ class HomeAssistantEndToEnd(unittest.IsolatedAsyncioTestCase):
             self.assertIn('customElements.define("habit-tracker-card"', card)
             self.assertNotIn(self.token, card)
             self.assertEqual(card, (CLIENT_ROOT / "custom_components/habit_tracker/www/habit-tracker-card.js").read_text())
-        async with self.session.get(f"http://127.0.0.1:{self.ha_port}/habit_tracker/frontend/0.1.1/manifest.json") as response:
+        async with self.session.get(f"http://127.0.0.1:{self.ha_port}/habit_tracker/frontend/0.1.2/manifest.json") as response:
             self.assertEqual(response.status, 404)
+
+    async def test_card_resource_upgrades_without_touching_other_resources(self):
+        resources = self.hass.data[LOVELACE_DATA].resources
+        foreign = await resources.async_create_item({"url": "/local/another-card.js", "res_type": "module"})
+        previous = await resources.async_create_item({"url": "/habit_tracker/frontend/0.1.1/habit-tracker-card.js", "res_type": "js"})
+        duplicate = await resources.async_create_item({"url": "/habit_tracker/frontend/0.1.1/habit-tracker-card.js?manual=1", "res_type": "module"})
+        flow = await self.hass.config_entries.flow.async_init("habit_tracker", context={"source": "user"})
+        result = await self.hass.config_entries.flow.async_configure(flow["flow_id"], {
+            "url": self.url, "token": self.token, "allow_http": True})
+        await self.hass.async_block_till_done()
+        self.assertEqual(result["result"].state, ConfigEntryState.LOADED)
+        await self.assert_bundled_card()
+        items = {item["id"]: item for item in resources.async_items()}
+        self.assertEqual(len(items), 2)
+        self.assertEqual(items[foreign["id"]], foreign)
+        self.assertEqual(items[previous["id"]]["url"], "/habit_tracker/frontend/0.1.2/habit-tracker-card.js")
+        self.assertEqual(items[previous["id"]]["type"], "module")
+        self.assertNotIn(duplicate["id"], items)
+        self.assertTrue(await self.hass.config_entries.async_reload(result["result"].entry_id))
+        self.assertEqual(resources.async_items(), list(items.values()))
+
+    async def test_yaml_resources_remain_operator_managed_and_card_is_still_served(self):
+        lovelace = self.hass.data[LOVELACE_DATA]
+        declared = [{"url": "/local/another-card.js", "type": "module"}]
+        resources = ResourceYAMLCollection(declared.copy())
+        lovelace.resource_mode = "yaml"
+        lovelace.resources = resources
+        with self.assertLogs("custom_components.habit_tracker", level="WARNING") as logs:
+            flow = await self.hass.config_entries.flow.async_init("habit_tracker", context={"source": "user"})
+            result = await self.hass.config_entries.flow.async_configure(flow["flow_id"], {
+                "url": self.url, "token": self.token, "allow_http": True})
+            await self.hass.async_block_till_done()
+        self.assertEqual(result["result"].state, ConfigEntryState.LOADED)
+        self.assertIs(lovelace.resources, resources)
+        self.assertEqual(resources.async_items(), declared)
+        self.assertTrue(any("/habit_tracker/frontend/0.1.2/habit-tracker-card.js" in line for line in logs.output))
+        self.assertFalse(any(url.startswith("/habit_tracker/frontend/")
+                             for url in self.hass.data[DATA_EXTRA_MODULE_URL].urls))
+        async with self.session.get(f"http://127.0.0.1:{self.ha_port}/habit_tracker/frontend/0.1.2/habit-tracker-card.js") as response:
+            self.assertEqual(response.status, 200)
 
     async def test_transport_retry_reuses_key_and_redirect_never_receives_token(self):
         from aiohttp import web
