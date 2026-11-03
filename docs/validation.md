@@ -451,3 +451,34 @@ fournisseur externe. Aucun secret réel ni Home Assistant personnel n'est utilis
   les validations : `ghcr.io/floriaaan/habits:latest` et
   `sha-b94553e49b8bc2980f9255d76ca2024ca04da76c`. Aucun conteneur de production
   ni instance HA personnelle de l'opérateur n'a été modifié.
+
+
+## Verres cliquables et stabilité des animations — 2026-11-03
+
+- Backend `bf8bc9f`, client `7e57bb2`, correctif HACS **0.3.1**.
+- **69 tests Rust réussis** : 66 tests de bibliothèque, deux tests de démarrage,
+  un test OTLP. Fmt, Clippy (warnings refusés), build release natif, OpenAPI généré
+  et frontières du domaine : succès.
+- Nouvelle action `set_value` testée en concurrence/rejeu, conflit de contenu,
+  réduction/annulation, compensation XP, isolation, scopes et valeurs invalides.
+  La protection des sources est couverte : un total sous le solde fournisseur
+  est refusé, une augmentation puis un retour à ce solde préservent la source.
+- Chrome : pas de verre plein fictif sur un élément construit hors du DOM,
+  absence d'animation d'entrée, identité du nœud et de l'animation inchangée lors
+  d'un refresh sans modification de cible, remplissage/vidage interrompu,
+  clic sur le troisième verre envoyant une unique action set_value=750 et focus
+  conservé sur ce verre, responsive et reduced-motion. Test navigateur Linux,
+  HACS et Hassfest réussis dans [le client](https://github.com/floriaaan/habit-tracker-ha/actions/runs/41733431749).
+- Le parcours HA principal local sort avec code 0 et envoie des valeurs absolues
+  750, 250 et 0 par le vrai service HA vers le vrai backend. Les assertions sont
+  conservées dans la suite HA exécutée sur Linux avant publication.
+- Trois tests d'archives réussis ; 19 fichiers de ZIP identiques au composant
+  committé, SHA-256 `b8c06e3f26403d044cb83d3d149f80985c3fc42b209cc86fef126dcad3ed6710`.
+
+- [CI complète réussie](https://github.com/floriaaan/habits/actions/runs/41733459520) :
+  69 tests Rust, 7 tests HA réels sur Linux, audit/deny, smoke Docker AMD64/ARM64
+  et publication du manifeste `ghcr.io/floriaaan/habits:latest`, révision
+  `bf8bc9fd111b55c67572e2cd0922edd6c528aad5`.
+- [Release HACS v0.3.1](https://github.com/floriaaan/habit-tracker-ha/releases/tag/v0.3.1)
+  avec le ZIP vérifié ci-dessus. Mise à jour backend nécessaire pour set_value ;
+  pas de nouveau scope ni de migration. Aucune instance HA personnelle modifiée.

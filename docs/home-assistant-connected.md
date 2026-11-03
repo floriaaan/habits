@@ -272,4 +272,4 @@ existante `POST /api/v1/habits/{id}/actions`. Elle exige `entries:write`, une cl
 d'idempotence et une habitude quantitative/de durée. La valeur vise le total de
 la période ; les réductions corrigent les entrées manuelles et compensent XP.
 Une valeur sous le solde fournisseur est refusée. Les autres actions refusent
-le champ `value`. Sans ce champ, leurs payloads/reçus restent identiques.
+une valeur non nulle. Sans ce champ, leurs payloads/reçus restent identiques.
