@@ -2,6 +2,10 @@
 
 2026-11-03. Complément de l'ADR-001, avant implémentation.
 
+La publication a ensuite été autorisée et le client déplacé dans un sous-module
+public ; voir [decisions-ha-submodule.md](decisions-ha-submodule.md). Les décisions
+ci-dessous décrivent l'étape de préparation initiale.
+
 - Une seule entrée HACS, de type **Integration**, livre le composant Python et la
   carte connectée. Source canonique : `custom_components/habit_tracker/` à la racine
   du dépôt, seule intégration présente. La carte est embarquée dans `www/` ; le

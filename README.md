@@ -13,9 +13,16 @@ testés hors ligne ; leur validation avec des comptes réels reste à effectuer.
 L'[intégration Home Assistant connectée](docs/home-assistant-connected.md) fournit
 entités automatiques, carte, anneaux, actions et mises à jour en direct. Le
 [paquet HACS](docs/home-assistant-connected.md#installer-via-hacs) installe la carte
-avec l'intégration, sans ressource Lovelace manuelle. HACS exige un dépôt public :
-ce dépôt reste privé, l'export du seul client HA est prêt pour une publication séparée.
-En attendant, `task ha:install HA_CONFIG_DIR=/chemin/config-ha` reste disponible.
+avec l'intégration, sans ressource Lovelace manuelle, depuis le dépôt public
+[floriaaan/habit-tracker-ha](https://github.com/floriaaan/habit-tracker-ha).
+Le backend reste privé. Le client est verrouillé par le sous-module
+`integrations/home-assistant/habit-tracker-ha` ; après clonage du backend :
+
+```sh
+git submodule update --init --recursive
+```
+
+Le parcours par copie `task ha:install HA_CONFIG_DIR=/chemin/config-ha` reste disponible.
 Redémarrer HA puis configurer URL/token dans l'intégration. Le
 [prototype de laboratoire](docs/home-assistant-ui.md), avec ses helpers et ses
 statistiques fictives, est conservé séparément. Les cartes ne sont pas compilées

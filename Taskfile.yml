@@ -7,6 +7,8 @@ vars:
     sh: id -g
   COMPOSE: docker compose --project-name habits-dev --file compose.dev.yaml
   TIMEZONE: Europe/Paris
+  HA_CLIENT: integrations/home-assistant/habit-tracker-ha
+  HA_REPOSITORY: floriaaan/habit-tracker-ha
 
 env:
   DEV_UID: '{{.DEV_UID}}'
@@ -57,7 +59,7 @@ tasks:
       HA_SYNC_DEST: '{{.HA_WWW_DIR}}'
     sources:
       - integrations/home-assistant/cards/habit-lab-visual-card.js
-      - custom_components/habit_tracker/www/habit-tracker-card.js
+      - '{{.HA_CLIENT}}/custom_components/habit_tracker/www/habit-tracker-card.js'
     # Copier aussi au premier lancement ou si la destination change.
     status: ['false']
     preconditions:
@@ -65,12 +67,10 @@ tasks:
         msg: HA_WWW_DIR doit être un dossier existant (www du composant connecté ou du prototype).
     cmds:
       - cp integrations/home-assistant/cards/habit-lab-visual-card.js "$HA_SYNC_DEST/habit-lab-visual-card.js"
-      - cp custom_components/habit_tracker/www/habit-tracker-card.js "$HA_SYNC_DEST/habit-tracker-card.js"
+      - cp {{.HA_CLIENT}}/custom_components/habit_tracker/www/habit-tracker-card.js "$HA_SYNC_DEST/habit-tracker-card.js"
 
   ha:package:
-    desc: Exporte intégration/carte seules pour un dépôt HACS public distinct (sans publication)
-    requires:
-      vars: [HA_REPOSITORY]
+    desc: Exporte les archives du client HACS verrouillé par le sous-module
     env:
       HA_EXPORT_REPOSITORY: '{{.HA_REPOSITORY}}'
     cmds:
@@ -93,11 +93,11 @@ tasks:
       HA_SSH_TARGET: '{{.HA_SSH_HOST}}'
     sources:
       - integrations/home-assistant/cards/habit-lab-visual-card.js
-      - custom_components/habit_tracker/www/habit-tracker-card.js
+      - '{{.HA_CLIENT}}/custom_components/habit_tracker/www/habit-tracker-card.js'
     status: ['false']
     cmds:
       - |
-        tar -cf - -C integrations/home-assistant/cards habit-lab-visual-card.js -C ../../../custom_components/habit_tracker/www habit-tracker-card.js |
+        tar -cf - -C integrations/home-assistant/cards habit-lab-visual-card.js -C ../habit-tracker-ha/custom_components/habit_tracker/www habit-tracker-card.js |
         ssh -- "$HA_SSH_TARGET" '
           set -eu
           if test -f /homeassistant/configuration.yaml; then

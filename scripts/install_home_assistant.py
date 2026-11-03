@@ -13,8 +13,11 @@ def main():
         parser.error("config_dir must contain configuration.yaml")
     root = Path(__file__).resolve().parents[1]
     source = root / "integrations/home-assistant"
+    component = source / "habit-tracker-ha/custom_components/habit_tracker"
+    if not (component / "manifest.json").is_file():
+        parser.error("HA submodule missing: run git submodule update --init --recursive")
     destination = target / "custom_components/habit_tracker"
-    shutil.copytree(root / "custom_components/habit_tracker", destination,
+    shutil.copytree(component, destination,
                     dirs_exist_ok=True, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
     cards = target / "www/habit-tracker"
     cards.mkdir(parents=True, exist_ok=True)

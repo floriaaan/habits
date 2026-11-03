@@ -27,7 +27,7 @@ from homeassistant.bootstrap import async_load_base_functionality
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
-from package_home_assistant import package
+from package_home_assistant import CLIENT_ROOT, package
 
 class LoopbackResolver(aiohttp.ThreadedResolver):
     async def close(self):
@@ -194,7 +194,7 @@ class HomeAssistantEndToEnd(unittest.IsolatedAsyncioTestCase):
             card = await response.text()
             self.assertIn('customElements.define("habit-tracker-card"', card)
             self.assertNotIn(self.token, card)
-            self.assertEqual(card, (ROOT / "custom_components/habit_tracker/www/habit-tracker-card.js").read_text())
+            self.assertEqual(card, (CLIENT_ROOT / "custom_components/habit_tracker/www/habit-tracker-card.js").read_text())
         async with self.session.get(f"http://127.0.0.1:{self.ha_port}/habit_tracker/frontend/0.1.1/manifest.json") as response:
             self.assertEqual(response.status, 404)
 

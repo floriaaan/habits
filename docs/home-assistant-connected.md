@@ -11,28 +11,30 @@ Une seule intégration HACS installe le composant et la carte connectée. La car
 est embarquée dans `custom_components/habit_tracker/www/` et chargée automatiquement
 par HA, sans copie dans `/config/www` ni ressource Lovelace à déclarer.
 
-**Publication publique encore nécessaire** : `floriaaan/habits` est privé, et
-[HACS ne gère pas les dépôts privés](https://www.hacs.dev/docs/faq/private_repositories/).
-Le code est au format HACS ; un dépôt public distinct limité au client HA peut être
-créé après accord, sans publier le backend ni son historique. Pour préparer ce dépôt :
+Le dépôt public d'installation est
+[floriaaan/habit-tracker-ha](https://github.com/floriaaan/habit-tracker-ha).
+Le backend `floriaaan/habits` reste privé ; le client est un sous-module verrouillé
+à `integrations/home-assistant/habit-tracker-ha`. Pour préparer le poste :
 
 ```sh
-task ha:package HA_REPOSITORY=PROPRIETAIRE/DEPOT_PUBLIC
+git submodule update --init --recursive
+task ha:package
 ```
 
-Remplacer le paramètre par le nom réellement choisi. `target/hacs/hacs-repository.zip`
+`target/hacs/hacs-repository.zip`
 contient l'arborescence du dépôt de distribution (`hacs.json`, README, licence et
 `custom_components/habit_tracker/`) ; `target/hacs/habit_tracker.zip` contient
 uniquement le composant à extraire dans `/config/custom_components/habit_tracker/`.
-La commande ne publie rien. Les liens du manifest exporté ciblent le dépôt donné.
-La CI produit également ces deux archives et exécute Hassfest ; le validateur HACS
-est réservé à un dépôt public. Aucune admission au catalogue HACS n'est revendiquée.
+La commande ne publie rien ; ces archives de secours suivent le commit verrouillé.
+La CI privée teste les archives et l'intégration avec Rust. HACS et Hassfest
+s'exécutent dans le dépôt public. Aucune admission au catalogue HACS n'est revendiquée.
 
-Une fois le dépôt de distribution public : **HACS → ⋮ → Dépôts personnalisés → URL
-GitHub → Integration → Ajouter**, chercher **Habit Tracker**, télécharger et
+Dans **HACS → ⋮ → Dépôts personnalisés**, saisir
+`https://github.com/floriaaan/habit-tracker-ha`, choisir **Integration → Ajouter**,
+chercher **Habit Tracker**, télécharger et
 redémarrer HA. Pas de deuxième dépôt Dashboard à installer. HA **2026.10.2 minimum**.
 Le serveur Rust se lance séparément ; HACS n'installe pas un add-on du backend.
-Voir le [guide livré dans le paquet](../integrations/home-assistant/README-HACS.md).
+Voir le [guide public](https://github.com/floriaaan/habit-tracker-ha#installation-hacs).
 
 ## Installation par copie (secours et développement)
 
@@ -46,7 +48,8 @@ Le dossier doit déjà contenir `configuration.yaml`. La commande copie seulemen
 `custom_components/habit_tracker/` et le prototype dans `www/habit-tracker/`.
 Elle ne modifie pas `configuration.yaml`, les autres intégrations ou les dashboards.
 Sans montage local, copier le dossier
-`custom_components/habit_tracker` dans `/config/custom_components/` par SSH/SFTP.
+`integrations/home-assistant/habit-tracker-ha/custom_components/habit_tracker`
+dans `/config/custom_components/` par SSH/SFTP.
 Aucun secret HA n'est requis pour cette copie.
 
 ## Configurer le backend et l'intégration
@@ -65,7 +68,7 @@ Aucun secret HA n'est requis pour cette copie.
    migration, retirer l'ancienne ressource `/local/habit-tracker/habit-tracker-card.js?...`
    pour éviter de charger une ancienne version. Conserver la config entry existante.
 5. Importer la vue de
-   [dashboard.yaml](../custom_components/habit_tracker/www/dashboard.yaml).
+   [dashboard.yaml](../integrations/home-assistant/habit-tracker-ha/custom_components/habit_tracker/www/dashboard.yaml).
    Remplacer `sensor.habit_tracker_dashboard` si HA a choisi un autre identifiant.
 
 Le token est conservé dans les config entries côté serveur HA. Protéger le dossier
@@ -191,8 +194,25 @@ ou rechargement adapté de l'intégration. Cela ne constitue pas un hot reload P
 
 ## Validation reproductible
 
+Les changements du client se font dans le sous-module. Pousser son commit dans
+le dépôt public, puis enregistrer le nouveau pointeur dans le backend :
+
+```sh
+git -C integrations/home-assistant/habit-tracker-ha switch main
+# Modifier, tester, committer puis pousser le client depuis ce dossier.
+git add integrations/home-assistant/habit-tracker-ha
+git commit -m "chore: update Home Assistant client"
+```
+
+Pour sélectionner la dernière version publiée sur la branche du client,
+`git submodule update --remote integrations/home-assistant/habit-tracker-ha`,
+puis tester et committer le pointeur. Pour un nouveau clone :
+`git clone --recurse-submodules https://github.com/floriaaan/habits.git`.
+La commande exige toujours l'accès au dépôt privé du backend.
+
 ```sh
 cargo build --locked
+git submodule update --init --recursive
 python3.14 -m venv /tmp/habits-ha-tests
 /tmp/habits-ha-tests/bin/pip install homeassistant==2026.10.2 home-assistant-frontend==20260930.4
 HABIT_TRACKER_BIN="$PWD/target/debug/habit-tracker" \

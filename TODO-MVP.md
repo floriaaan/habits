@@ -57,7 +57,7 @@ La recette des fournisseurs réels et le déploiement ne sont pas déclarés ter
 17. [Implémenter endpoints et connecteur Home Assistant](https://app.notion.com/p/40c4a85853dd81cea90ac0a1dca46012) — **intégration livrée ; déploiement homelab à valider**.
    Dashboard/PAT/SA, actions idempotentes et SSE révocable, intégration installable créant les entités, notifications/rappels persistants, token sortant chiffré. Tests HA 2026.10.2 + vrai binaire Rust isolés, panne/retry/DST couverts. Dépendance : 7, 10–13, 15.
 
-18. [Documenter intégration Lovelace et notifications actionnables](https://app.notion.com/p/40c4a85853dd8163b256f2c3bc15ccbb) — **carte connectée et format HACS livrés ; publication HACS publique et notifications actionnables restantes**.
+18. [Documenter intégration Lovelace et notifications actionnables](https://app.notion.com/p/40c4a85853dd8163b256f2c3bc15ccbb) — **carte connectée et dépôt HACS public livrés, client en sous-module ; notifications actionnables restantes**.
    Carte et vue dédiées sans secrets ni valeurs fictives ; métadonnées et portions génériques, responsive et états d'erreur. Ancien laboratoire conservé. Guide docs/home-assistant-connected.md ; recette visuelle dans le HA homelab et notifications actionnables natives à compléter, aucune PWA. Dépendance : 17.
 
 19. [Documenter API OpenAPI v1 et pagination](https://app.notion.com/p/40c4a85853dd814f8fd5c42c6657f2fc) — **livré pour les routes actuelles**.

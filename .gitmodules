@@ -1,0 +1,4 @@
+[submodule "integrations/home-assistant/habit-tracker-ha"]
+	path = integrations/home-assistant/habit-tracker-ha
+	url = https://github.com/floriaaan/habit-tracker-ha.git
+	branch = main

@@ -4,11 +4,13 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 from zipfile import ZipFile
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 from package_home_assistant import package
+import package_home_assistant
 
 
 class HacsPackageTest(unittest.TestCase):
@@ -46,6 +48,14 @@ class HacsPackageTest(unittest.TestCase):
             for repository in ("https://github.com/fixture/repo", "../..", "fixture/repo/path", "fixture/repo\n", "fixture/repo;echo"):
                 with self.subTest(repository=repository), self.assertRaises(ValueError):
                     package(Path(temporary), repository)
+
+    def test_missing_submodule_fails_with_initialization_command(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            with patch.object(package_home_assistant, "CLIENT_ROOT", directory / "missing"):
+                with self.assertRaisesRegex(ValueError, "git submodule update --init --recursive"):
+                    package(directory / "output", "floriaaan/habit-tracker-ha")
+            self.assertFalse((directory / "output").exists())
 
 
 if __name__ == "__main__":
