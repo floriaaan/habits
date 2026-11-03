@@ -16,7 +16,7 @@ Le backend ne fournit pas d'interface web autonome.
 
 ## Installation
 
-Avec Docker et Docker Compose 2.23.1+, enregistrez ce bloc dans un **`compose.yaml`** dans
+Avec Docker et Docker Compose, enregistrez ce bloc dans un **`compose.yaml`** dans
 votre dossier de déploiement. L'image GHCR est disponible pour AMD64 et ARM64 ;
 aucune compilation n'est nécessaire. Toutes les variables runtime sont définies ;
 laissez les groupes optionnels vides si vous ne les utilisez pas.
@@ -83,9 +83,13 @@ services:
     environment:
       ROOTPRINT_ENDPOINT: ${ROOTPRINT_ENDPOINT:-}
       ROOTPRINT_INGEST_TOKEN: ${ROOTPRINT_INGEST_TOKEN:-}
-    configs:
-      - source: alloy_config
+    volumes:
+      - type: bind
+        source: ./config.alloy
         target: /etc/alloy/config.alloy
+        read_only: true
+        bind:
+          create_host_path: false
     command:
       - run
       - --storage.path=/tmp/alloy
@@ -95,29 +99,6 @@ services:
     restart: unless-stopped
     stop_grace_period: 30s
 
-configs:
-  alloy_config:
-    content: |
-      otelcol.receiver.otlp "habits" {
-        http {
-          endpoint = "0.0.0.0:4318"
-        }
-        output {
-          logs = [otelcol.exporter.otlphttp.rootprint.input]
-        }
-      }
-
-      otelcol.exporter.otlphttp "rootprint" {
-        encoding = "proto"
-        client {
-          endpoint = sys.env("ROOTPRINT_ENDPOINT")
-          compression = "none"
-          headers = {
-            "Authorization" = "Bearer " + sys.env("ROOTPRINT_INGEST_TOKEN"),
-          }
-        }
-      }
-
 
 volumes:
   habit_data:
@@ -125,9 +106,40 @@ volumes:
 ```
 
 Le service `alloy` est optionnel : il démarre uniquement avec le profil
-`observability`. Sa configuration est intégrée au Compose : aucun fichier
-`config.alloy` séparé n'est nécessaire, et aucun port Alloy n'est publié sur
-l'hôte. Sans ce profil, l'API démarre normalement avec ses logs console.
+`observability`. Aucun port Alloy n'est publié sur l'hôte. Sans ce profil, l'API
+démarre normalement avec ses logs console. Alloy reste non-root et en lecture seule.
+
+Créez **`config.alloy` à côté de `compose.yaml` sur l'hôte Docker**, avant d'activer
+le profil. Le fichier est monté en lecture seule : le montage inline
+`configs.content` n'est pas compatible avec les services en lecture seule dans
+certains environnements de déploiement. Avec un gestionnaire de stacks distant,
+créez le fichier sur l'hôte Docker et utilisez son chemin absolu dans `source`
+si le dossier de la stack diffère.
+
+```alloy
+otelcol.receiver.otlp "habits" {
+  http {
+    endpoint = "0.0.0.0:4318"
+  }
+  output {
+    logs = [otelcol.exporter.otlphttp.rootprint.input]
+  }
+}
+
+otelcol.exporter.otlphttp "rootprint" {
+  encoding = "proto"
+  client {
+    endpoint = sys.env("ROOTPRINT_ENDPOINT")
+    compression = "none"
+    headers = {
+      "Authorization" = "Bearer " + sys.env("ROOTPRINT_INGEST_TOKEN"),
+    }
+  }
+}
+```
+
+Rendez-le lisible par l'utilisateur du conteneur : `chmod 644 config.alloy`.
+Ce fichier ne contient aucun credential ; ils passent par l'environnement Alloy.
 
 Pour envoyer les logs vers **Rootprint**, ajoutez dans le `.env` à côté du Compose :
 

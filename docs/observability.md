@@ -26,7 +26,8 @@ environment:
 L'opérateur configure son receiver Alloy ou OpenTelemetry Collector pour accepter
 OTLP HTTP sur le port choisi et router les logs vers son stockage. Tout autre
 collecteur doit accepter ce même protocole. Le [Compose des README](../README.fr.md#installation)
-embarque Alloy dans le profil `observability` pour convertir le JSON en Protobuf
+embarque Alloy dans le profil `observability`, avec [config.alloy](../deploy/alloy/config.alloy)
+monté depuis l’hôte en lecture seule, pour convertir le JSON en Protobuf
 et l'envoyer à Rootprint avec sa clé d'ingestion. Rootprint exige actuellement
 `application/x-protobuf` sur `/v1/logs` : le sink JSON ne doit pas le viser
 directement. La configuration du bridge est validée ; aucun serveur Rootprint

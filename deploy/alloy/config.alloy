@@ -1,0 +1,19 @@
+otelcol.receiver.otlp "habits" {
+  http {
+    endpoint = "0.0.0.0:4318"
+  }
+  output {
+    logs = [otelcol.exporter.otlphttp.rootprint.input]
+  }
+}
+
+otelcol.exporter.otlphttp "rootprint" {
+  encoding = "proto"
+  client {
+    endpoint = sys.env("ROOTPRINT_ENDPOINT")
+    compression = "none"
+    headers = {
+      "Authorization" = "Bearer " + sys.env("ROOTPRINT_INGEST_TOKEN"),
+    }
+  }
+}
