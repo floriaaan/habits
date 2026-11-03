@@ -3,7 +3,7 @@
   "name": "Habit Tracker",
   "codeowners": ["@floriaaan"],
   "config_flow": true,
-  "dependencies": ["frontend"],
+  "dependencies": ["frontend", "http"],
   "documentation": "https://github.com/floriaaan/habits/blob/main/docs/home-assistant-connected.md",
   "integration_type": "service",
   "iot_class": "local_push",

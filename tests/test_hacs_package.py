@@ -30,7 +30,7 @@ class HacsPackageTest(unittest.TestCase):
                 manifest = json.loads(archive.read(prefix + "manifest.json"))
                 self.assertEqual(manifest["domain"], "habit_tracker")
                 self.assertEqual(manifest["documentation"], "https://github.com/fixture/habit-tracker-ha")
-                self.assertEqual(manifest["dependencies"], ["frontend"])
+                self.assertEqual(manifest["dependencies"], ["frontend", "http"])
                 with ZipFile(output / "habit_tracker.zip") as component:
                     self.assertEqual(set(component.namelist()), {n.removeprefix(prefix) for n in names if n.startswith(prefix)})
                     for name in component.namelist():

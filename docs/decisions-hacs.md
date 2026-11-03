@@ -6,7 +6,7 @@
   carte connectée. Source canonique : `custom_components/habit_tracker/` à la racine
   du dépôt, seule intégration présente. La carte est embarquée dans `www/` ; le
   prototype laboratoire reste séparé dans `integrations/home-assistant/cards/`.
-- L'intégration dépend de `frontend` et enregistre son module avec
+- L'intégration dépend explicitement de `frontend` et `http` et enregistre son module avec
   `frontend.add_extra_js_url`. Un chemin statique HA limité au seul fichier JS,
   versionné par le manifest, évite la copie dans `/config/www` et la déclaration
   manuelle d'une ressource Lovelace, en mode stockage comme en mode YAML.
