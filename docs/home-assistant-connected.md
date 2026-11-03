@@ -5,7 +5,36 @@ La carte `habit-tracker-card` utilise ces états et les services HA ; aucun PAT
 n'est placé dans le JavaScript ou dans Lovelace. Le laboratoire précédent reste
 disponible dans ses fichiers d'origine, sans être raccordé implicitement.
 
-## Installer
+## Installer via HACS
+
+Une seule intégration HACS installe le composant et la carte connectée. La carte
+est embarquée dans `custom_components/habit_tracker/www/` et chargée automatiquement
+par HA, sans copie dans `/config/www` ni ressource Lovelace à déclarer.
+
+**Publication publique encore nécessaire** : `floriaaan/habits` est privé, et
+[HACS ne gère pas les dépôts privés](https://www.hacs.dev/docs/faq/private_repositories/).
+Le code est au format HACS ; un dépôt public distinct limité au client HA peut être
+créé après accord, sans publier le backend ni son historique. Pour préparer ce dépôt :
+
+```sh
+task ha:package HA_REPOSITORY=PROPRIETAIRE/DEPOT_PUBLIC
+```
+
+Remplacer le paramètre par le nom réellement choisi. `target/hacs/hacs-repository.zip`
+contient l'arborescence du dépôt de distribution (`hacs.json`, README, licence et
+`custom_components/habit_tracker/`) ; `target/hacs/habit_tracker.zip` contient
+uniquement le composant à extraire dans `/config/custom_components/habit_tracker/`.
+La commande ne publie rien. Les liens du manifest exporté ciblent le dépôt donné.
+La CI produit également ces deux archives et exécute Hassfest ; le validateur HACS
+est réservé à un dépôt public. Aucune admission au catalogue HACS n'est revendiquée.
+
+Une fois le dépôt de distribution public : **HACS → ⋮ → Dépôts personnalisés → URL
+GitHub → Integration → Ajouter**, chercher **Habit Tracker**, télécharger et
+redémarrer HA. Pas de deuxième dépôt Dashboard à installer. HA **2026.10.2 minimum**.
+Le serveur Rust se lance séparément ; HACS n'installe pas un add-on du backend.
+Voir le [guide livré dans le paquet](../integrations/home-assistant/README-HACS.md).
+
+## Installation par copie (secours et développement)
 
 Sur un dossier de configuration HA accessible depuis le poste de développement :
 
@@ -14,13 +43,13 @@ task ha:install HA_CONFIG_DIR=/chemin/vers/config-ha
 ```
 
 Le dossier doit déjà contenir `configuration.yaml`. La commande copie seulement
-`custom_components/habit_tracker/` et les deux cartes dans `www/habit-tracker/`.
+`custom_components/habit_tracker/` et le prototype dans `www/habit-tracker/`.
 Elle ne modifie pas `configuration.yaml`, les autres intégrations ou les dashboards.
 Sans montage local, copier le dossier
-`integrations/home-assistant/custom_components/habit_tracker` dans
-`/config/custom_components/` par SSH/SFTP et la carte dans `/config/www/habit-tracker/`.
-Ce dépôt privé n'est pas un dépôt HACS au format standard ; l'installation par
-copie est le chemin livré. Aucun secret HA n'est requis pour cette copie.
+`custom_components/habit_tracker` dans `/config/custom_components/` par SSH/SFTP.
+Aucun secret HA n'est requis pour cette copie.
+
+## Configurer le backend et l'intégration
 
 1. Démarrer le backend avec `AUTH_MODE=local` ou l'OIDC configuré. Les routes
    restent refusées sans token ; `disabled` ne signifie pas accès anonyme.
@@ -28,14 +57,15 @@ copie est le chemin livré. Aucun secret HA n'est requis pour cette copie.
    `habits:read`, `statistics:read`, `entries:write`. Les deux premiers suffisent
    aux lectures ; le dernier est indispensable aux boutons. Utiliser le bootstrap
    CLI existant puis l'API de tokens pour obtenir un token à durée adaptée.
-3. Redémarrer HA après copie du composant Python. Dans **Paramètres → Appareils et
+3. Redémarrer HA après installation du composant Python. Dans **Paramètres → Appareils et
    services → Ajouter une intégration → Habit Tracker**, renseigner URL et token.
    HTTPS est requis par défaut. HTTP exige la case explicite et une liaison locale
    de confiance. Les redirections ne sont jamais suivies avec le token.
-4. Ajouter la ressource Lovelace de type **module JavaScript** :
-   `/local/habit-tracker/habit-tracker-card.js?v=1`.
+4. Recharger le navigateur : l'intégration charge la carte automatiquement. En
+   migration, retirer l'ancienne ressource `/local/habit-tracker/habit-tracker-card.js?...`
+   pour éviter de charger une ancienne version. Conserver la config entry existante.
 5. Importer la vue de
-   [habit-tracker-connected.yaml](../integrations/home-assistant/lovelace/habit-tracker-connected.yaml).
+   [dashboard.yaml](../custom_components/habit_tracker/www/dashboard.yaml).
    Remplacer `sensor.habit_tracker_dashboard` si HA a choisi un autre identifiant.
 
 Le token est conservé dans les config entries côté serveur HA. Protéger le dossier
@@ -148,13 +178,15 @@ proxy_read_timeout 75s;
 Pour le développement de la carte :
 
 ```sh
-task --watch ha:sync HA_WWW_DIR=/chemin/config-ha/www/habit-tracker
+task --watch ha:sync HA_WWW_DIR=/chemin/config-ha/custom_components/habit_tracker/www
 # Ou sans montage, après installation initiale et configuration de l'accès SSH :
 task --watch ha:sync:ssh HA_SSH_HOST=alias-ssh
 ```
 
-La copie est automatique ; recharger le navigateur HA après modification du JS
-(ou changer `?v=1`). Une modification Python exige une copie puis un redémarrage
+La task SSH utilise aussi le dossier du composant lorsqu'il est installé ; le
+prototype continue à aller dans `/config/www/habit-tracker`. La copie est automatique ;
+faire un rechargement complet du navigateur (cache ignoré) après modification du JS.
+Une modification Python exige une copie puis un redémarrage
 ou rechargement adapté de l'intégration. Cela ne constitue pas un hot reload Python.
 
 ## Validation reproductible
@@ -162,12 +194,13 @@ ou rechargement adapté de l'intégration. Cela ne constitue pas un hot reload P
 ```sh
 cargo build --locked
 python3.14 -m venv /tmp/habits-ha-tests
-/tmp/habits-ha-tests/bin/pip install homeassistant==2026.10.2
+/tmp/habits-ha-tests/bin/pip install homeassistant==2026.10.2 home-assistant-frontend==20260930.4
 HABIT_TRACKER_BIN="$PWD/target/debug/habit-tracker" \
   /tmp/habits-ha-tests/bin/python -m unittest discover -s tests -p test_home_assistant.py -v
 ```
 
-Ces tests lancent le vrai composant HA et le binaire Rust sur SQLite temporaire.
+Ces tests installent l'archive de distribution dans un vrai HA et lancent le binaire
+Rust sur SQLite temporaire. Le frontend et le module statique sont également testés.
 Seul le DNS/mDNS est remplacé par un resolveur de test standard, tous les endpoints
 étant sur loopback. Ils ne contactent pas une installation HA personnelle. La CI
 exécute ces tests avant publication de l'image. Pas de certification HA/HACS ni de

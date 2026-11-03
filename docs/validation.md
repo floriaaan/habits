@@ -167,3 +167,29 @@ vérifié avec le moteur headless T3. Docker/OrbStack était arrêté : smoke/bu
 Docker non relancés pour cette itération. Le workflow les conserve, ajoute les
 tests HA et attend leurs résultats avant publication GHCR. La recette sur le
 homelab réel, son proxy et ses credentials reste une opération de déploiement.
+
+## Paquet HACS — 2026-11-03
+
+- `python3 -m unittest discover -s tests -p test_hacs_package.py -v` : **2 tests
+  réussis**. Arborescence HACS standard, JS/dashboard/traductions embarqués,
+  correspondance des deux archives, exclusion du backend/historique Git/bytecode,
+  reconstruction sans récupérer les fichiers étrangers du dossier de sortie et
+  rejet des noms de dépôt contenant URL/traversée/commande.
+- **3 tests HA 2026.10.2 réussis**, désormais depuis l'archive de distribution
+  extraite dans une configuration temporaire. Le vrai frontend est démarré sur
+  loopback, le module embarqué est enregistré une seule fois, servi à l'identique
+  sans credential, et reste disponible après réauth/rechargement. Le chemin statique
+  ne permet pas de lire le manifest voisin. Les tests précédents d'actions, SSE,
+  transport et auth continuent à passer. Dépendance de test frontend :
+  `home-assistant-frontend==20260930.4`, celle du manifest HA 2026.10.2.
+- `task ha:package HA_REPOSITORY=floriaaan/habits` produit les deux archives dans
+  `target/hacs/`, sans publication. `actionlint` sur les deux workflows, syntaxe JS
+  avec Node et `git diff --check` : succès.
+- Installation et tasks `ha:sync`/`ha:sync:ssh` vérifiées avec configuration et
+  transport SSH locaux temporaires : fichiers étrangers conservés, carte connectée
+  copiée dans le composant HACS, prototype dans `www`, temporaires nettoyés.
+
+Le dépôt source est privé. L'installation depuis l'API publique HACS et une
+publication publique ne sont pas testées/revendiquées. Le workflow Hassfest est
+prévu ; son résultat distant est à vérifier. Le validateur HACS est conditionné à
+un dépôt public. Le backend Rust n'a pas changé dans cette itération.

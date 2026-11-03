@@ -88,7 +88,9 @@ pour cette carte de laboratoire.
 
 ## Développer avec les changements dans Home Assistant
 
-Le dépôt ne fournit pas encore de package HACS, d'intégration Python HA ni d'app
+La version connectée dispose désormais d'une intégration Python et d'un
+[paquet HACS](home-assistant-connected.md#installer-via-hacs) incluant sa propre
+carte ; le prototype décrit ici reste séparé. Ce prototype n'est pas une app
 (anciennement add-on) installable. Pour utiliser la carte actuelle, HA doit servir
 son fichier JavaScript ; le backend Rust reste un processus séparé. Les changements
 d'un dépôt Git distant ne sont pas récupérés automatiquement par Home Assistant.

@@ -11,14 +11,17 @@ Pocket ID/OIDC, Strava et Home Assistant sont facultatifs. Leurs adaptateurs son
 testés hors ligne ; leur validation avec des comptes réels reste à effectuer.
 
 L'[intégration Home Assistant connectée](docs/home-assistant-connected.md) fournit
-entités automatiques, carte, anneaux, actions et mises à jour en direct. Installer
-avec `task ha:install HA_CONFIG_DIR=/chemin/config-ha`, puis redémarrer HA et
-configurer URL/token dans l'intégration. Le
+entités automatiques, carte, anneaux, actions et mises à jour en direct. Le
+[paquet HACS](docs/home-assistant-connected.md#installer-via-hacs) installe la carte
+avec l'intégration, sans ressource Lovelace manuelle. HACS exige un dépôt public :
+ce dépôt reste privé, l'export du seul client HA est prêt pour une publication séparée.
+En attendant, `task ha:install HA_CONFIG_DIR=/chemin/config-ha` reste disponible.
+Redémarrer HA puis configurer URL/token dans l'intégration. Le
 [prototype de laboratoire](docs/home-assistant-ui.md), avec ses helpers et ses
 statistiques fictives, est conservé séparément. Les cartes ne sont pas compilées
 avec Rust.
 Pour répercuter les changements de carte dans HA, utiliser
-`task --watch ha:sync HA_WWW_DIR="/chemin/vers/config/www/habit-tracker"`
+`task --watch ha:sync HA_WWW_DIR="/chemin/config/custom_components/habit_tracker/www"`
 avec le dossier HA monté sur le poste de développement, puis recharger la page HA.
 Avec un accès SSH, utiliser plutôt
 `task --watch ha:sync:ssh HA_SSH_HOST="alias-ssh"` : aucun partage monté nécessaire.

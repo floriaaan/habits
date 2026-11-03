@@ -8,22 +8,26 @@ from datetime import datetime, timedelta, timezone
 import json
 import os
 from pathlib import Path
-import shutil
 import socket
 import subprocess
 import sys
 import tempfile
 import unittest
 from unittest.mock import patch
+from zipfile import ZipFile
 
 import aiohttp
 from homeassistant.core import HomeAssistant
 from homeassistant.config_entries import ConfigEntries, ConfigEntryState
 from homeassistant import loader
+from homeassistant.auth import auth_manager_from_config
+from homeassistant.components.frontend import DATA_EXTRA_MODULE_URL
 from homeassistant.setup import async_setup_component
 from homeassistant.bootstrap import async_load_base_functionality
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "scripts"))
+from package_home_assistant import package
 
 class LoopbackResolver(aiohttp.ThreadedResolver):
     async def close(self):
@@ -68,14 +72,22 @@ class HomeAssistantEndToEnd(unittest.IsolatedAsyncioTestCase):
             self.fail("Isolated backend did not become ready")
         config = self.path / "config"
         config.mkdir()
-        shutil.copytree(ROOT / "integrations/home-assistant/custom_components/habit_tracker",
-                        config / "custom_components/habit_tracker")
+        # Install the exact integration ZIP produced for distribution, not source files.
+        package(self.path / "package", "fixture/habit-tracker-ha")
+        with ZipFile(self.path / "package/habit_tracker.zip") as archive:
+            archive.extractall(config / "custom_components/habit_tracker")
         sys.path.insert(0, str(config))
         self.addCleanup(sys.path.remove, str(config))
         self.hass = HomeAssistant(str(config))
         loader.async_setup(self.hass)
-        self.hass.config_entries = ConfigEntries(self.hass, {})
+        with socket.socket() as sock:
+            sock.bind(("127.0.0.1", 0))
+            self.ha_port = sock.getsockname()[1]
+        self.hass_config = {"http": {"server_host": "127.0.0.1", "server_port": self.ha_port},
+                            "frontend": {}}
+        self.hass.config_entries = ConfigEntries(self.hass, self.hass_config)
         await async_load_base_functionality(self.hass)
+        self.hass.auth = await auth_manager_from_config(self.hass, [{"type": "homeassistant"}], [])
         # Only replace DNS/mDNS discovery, not HA or its integration APIs.
         # Every test endpoint is a literal loopback IP; no LAN discovery needed.
         resolver = LoopbackResolver()
@@ -83,7 +95,8 @@ class HomeAssistantEndToEnd(unittest.IsolatedAsyncioTestCase):
         resolver_patch = patch("homeassistant.helpers.aiohttp_client._async_make_resolver", return_value=resolver)
         resolver_patch.start()
         self.addCleanup(resolver_patch.stop)
-        await async_setup_component(self.hass, "homeassistant", {})
+        self.assertTrue(await async_setup_component(self.hass, "homeassistant", self.hass_config))
+        self.assertTrue(await async_setup_component(self.hass, "frontend", self.hass_config))
         await self.hass.async_start()
         self.addAsyncCleanup(self.hass.async_stop)
 
@@ -129,6 +142,7 @@ class HomeAssistantEndToEnd(unittest.IsolatedAsyncioTestCase):
         entry = result["result"]
         self.assertEqual(entry.state, ConfigEntryState.LOADED)
         self.entry = entry
+        await self.assert_bundled_card()
         dashboards = [s for s in self.hass.states.async_all("sensor") if "groups" in s.attributes]
         self.assertEqual(len(dashboards), 1)
         dashboard_id = dashboards[0].entity_id
@@ -165,9 +179,24 @@ class HomeAssistantEndToEnd(unittest.IsolatedAsyncioTestCase):
         await self.hass.async_block_till_done()
         self.assertTrue(old_task.done())
         self.assertEqual(entry.state, ConfigEntryState.LOADED)
+        await self.assert_bundled_card()
         task = entry.runtime_data.stream_task
         self.assertTrue(await self.hass.config_entries.async_unload(entry.entry_id))
         self.assertTrue(task.done())
+
+    async def assert_bundled_card(self):
+        modules = self.hass.data[DATA_EXTRA_MODULE_URL].urls
+        cards = [url for url in modules if url.startswith("/habit_tracker/frontend/")]
+        self.assertEqual(cards, ["/habit_tracker/frontend/0.1.1/habit-tracker-card.js"])
+        # Only a static, credential-free module is publicly served; no directory exposure.
+        async with self.session.get(f"http://127.0.0.1:{self.ha_port}" + cards[0]) as response:
+            self.assertEqual(response.status, 200)
+            card = await response.text()
+            self.assertIn('customElements.define("habit-tracker-card"', card)
+            self.assertNotIn(self.token, card)
+            self.assertEqual(card, (ROOT / "custom_components/habit_tracker/www/habit-tracker-card.js").read_text())
+        async with self.session.get(f"http://127.0.0.1:{self.ha_port}/habit_tracker/frontend/0.1.1/manifest.json") as response:
+            self.assertEqual(response.status, 404)
 
     async def test_transport_retry_reuses_key_and_redirect_never_receives_token(self):
         from aiohttp import web

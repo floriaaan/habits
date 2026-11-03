@@ -1,0 +1,53 @@
+name: Home Assistant distribution
+on:
+  push:
+    paths:
+      - 'custom_components/**'
+      - 'hacs.json'
+      - 'integrations/home-assistant/README-HACS.md'
+      - 'scripts/package_home_assistant.py'
+      - 'tests/test_hacs_package.py'
+      - '.github/workflows/hacs.yml'
+  pull_request:
+    paths:
+      - 'custom_components/**'
+      - 'hacs.json'
+      - 'integrations/home-assistant/README-HACS.md'
+      - 'scripts/package_home_assistant.py'
+      - 'tests/test_hacs_package.py'
+      - '.github/workflows/hacs.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: python3 -m unittest discover -s tests -p test_hacs_package.py -v
+      - name: Export integration and curated repository (no publication)
+        env:
+          HA_REPOSITORY: ${{ github.repository }}
+        run: python3 scripts/package_home_assistant.py --repository "$HA_REPOSITORY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: habit-tracker-hacs
+          path: target/hacs/*.zip
+          if-no-files-found: error
+  hassfest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: home-assistant/actions/hassfest@86d4564712fa02543c808e3a693dd04f9d3f8361
+  hacs:
+    # HACS cannot validate/install a private source repository through its public API.
+    if: github.event.repository.private == false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: hacs/action@1ebf01c408f29afcb6406bd431bc98fd8cbb15aa
+        with:
+          category: integration
+          # Custom-repository distribution, not a submission to the default catalogue.
+          ignore: brands
+          comment: 'false'
