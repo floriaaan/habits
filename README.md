@@ -219,7 +219,9 @@ La CI construit et publie dans `ghcr.io/<owner>/<repository>` avec `GITHUB_TOKEN
 après validation Rust/Docker, sur branche par défaut, tags SemVer et déclenchement
 manuel ; aucune publication depuis les PR. Images amd64/arm64, tags SHA/SemVer/latest
 selon événement. [Conditions exactes](docs/container-publishing.md).
-Aucun push réel n'a été réalisé depuis ce dépôt sans remote GitHub.
+Les images sont compilées et testées sur runners natifs AMD64/ARM64, puis publiées
+sans recompilation. Les dépendances Rust, les outils d'audit, pip et les couches
+Docker sont mis en cache ; les commits purement documentaires ignorent ces builds.
 
 ## Vérification
 

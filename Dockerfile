@@ -1,12 +1,17 @@
 # syntax=docker/dockerfile:1
-FROM rust:1.99.1-bookworm@sha256:9181b56c2a21ab1d5e73cffe04fc762426d30aa7fac3c91141dd033f49a7fc8b AS build
+FROM rust:1.99.1-bookworm@sha256:9181b56c2a21ab1d5e73cffe04fc762426d30aa7fac3c91141dd033f49a7fc8b AS dependencies
 WORKDIR /app
 COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
+# This repository has one binary and no build script. Cache its dependencies in
+# an exported layer; ephemeral cache mounts are not included in the GHA cache.
+RUN mkdir src && printf 'fn main() {}\n' > src/main.rs \
+    && cargo build --locked --release \
+    && rm -rf src target/release/habit-tracker target/release/deps/habit_tracker-*
+
+FROM dependencies AS build
 COPY migrations ./migrations
 COPY src ./src
-RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,target=/app/target \
-    cargo build --locked --release && cp target/release/habit-tracker /usr/local/bin/habit-tracker
+RUN cargo build --locked --release && cp target/release/habit-tracker /usr/local/bin/habit-tracker
 
 FROM debian:bookworm-slim@sha256:99c0b25c46d0214d5a2091092e7908907dcaecd6a962cde0ac700acee222b6f3 AS runtime
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates sqlite3 \

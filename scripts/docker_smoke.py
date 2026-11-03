@@ -2,7 +2,9 @@
 
 Uses an ephemeral project/port/volume; never removes the normal deployment volume.
 Run from repository root: python3 scripts/docker_smoke.py
+With an already built local image: python3 scripts/docker_smoke.py --no-build
 """
+import argparse
 import json
 import os
 import subprocess
@@ -10,6 +12,11 @@ import urllib.error
 import urllib.request
 import uuid
 from datetime import datetime, timezone
+
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--no-build", action="store_true", help="Test the existing local image without rebuilding or pulling")
+args = parser.parse_args()
+build_arguments = ("--no-build", "--pull", "never") if args.no_build else ("--build",)
 
 project = "habits-smoke-" + uuid.uuid4().hex[:12]
 environment = dict(os.environ, COMPOSE_PROJECT_NAME=project, HOST_PORT="0")
@@ -31,7 +38,7 @@ def compose(*arguments):
 
 
 try:
-    print(compose("up", "--build", "--detach", "--wait", "--wait-timeout", "90"), flush=True)
+    print(compose("up", *build_arguments, "--detach", "--wait", "--wait-timeout", "90"), flush=True)
     container = compose("ps", "--quiet", "api").strip()
     inspection = json.loads(subprocess.check_output(["docker", "inspect", container], text=True))[0]
     assert inspection["Config"]["User"] == "10001:10001"
@@ -57,7 +64,7 @@ try:
     issued = json.loads(compose("exec", "-T", "api", "/usr/local/bin/habit-tracker", "bootstrap-local", "UTC"))
     token = issued["token"]
     environment["AUTH_MODE"] = "local"
-    compose("up", "--detach", "--wait", "--wait-timeout", "90")
+    compose("up", *build_arguments, "--detach", "--wait", "--wait-timeout", "90")
     url = "http://" + compose("port", "api", "8080").strip()
 
     def api(path, method="GET", payload=None, key=None):
@@ -82,8 +89,8 @@ try:
     assert "ok" in compose("exec", "-T", "api", "sqlite3", "/data/smoke-backup.sqlite", "PRAGMA quick_check;")
     compose("stop", "api")
     # Remove WAL sidecars only after graceful shutdown; restore a verified snapshot.
-    compose("run", "--rm", "--no-deps", "--entrypoint", "/bin/sh", "api", "-ec", "test -s /data/smoke-backup.sqlite; rm -f /data/habits.sqlite-wal /data/habits.sqlite-shm; cp /data/smoke-backup.sqlite /data/habits.sqlite")
-    compose("up", "--detach", "--wait", "--wait-timeout", "90")
+    compose("run", "--rm", "--no-deps", "--pull", "never", "--entrypoint", "/bin/sh", "api", "-ec", "test -s /data/smoke-backup.sqlite; rm -f /data/habits.sqlite-wal /data/habits.sqlite-shm; cp /data/smoke-backup.sqlite /data/habits.sqlite")
+    compose("up", *build_arguments, "--detach", "--wait", "--wait-timeout", "90")
     address = compose("port", "api", "8080").strip()
     with urllib.request.urlopen("http://" + address + "/health/ready", timeout=5) as response:
         assert response.status == 200
