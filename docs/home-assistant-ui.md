@@ -1,5 +1,10 @@
 # Interface Home Assistant — export du laboratoire
 
+Une [intégration et une carte connectées](home-assistant-connected.md) sont
+maintenant disponibles séparément. Ce document décrit les anciens exports de
+laboratoire conservés à l'identique ; leurs valeurs simulées ne deviennent pas
+automatiquement des données API.
+
 Snapshot du 2 novembre 2026, importé depuis la section « Export UI Home Assistant »
 de la [page du projet Notion](https://app.notion.com/p/40c4a85853dd81bc996df54f7aad39cd).
 Le README et le fragment `components.yaml` fournis accompagnent cette migration.

@@ -154,26 +154,16 @@ pub async fn authenticate(
     let Some(token) = token else {
         return ApiError::status(StatusCode::UNAUTHORIZED).into_response();
     };
-    let identity = match mode {
-        crate::config::AuthMode::Disabled => Err(DomainError::Unauthenticated),
-        crate::config::AuthMode::Tokens => store.authenticate_local_token(token).await,
-        crate::config::AuthMode::Oidc => {
-            if token.starts_with("ht_") {
-                store.authenticate_token(token).await
-            } else if let Some(verifier) = oidc {
-                match verifier.verify(token).await {
-                    Ok(identity) => {
-                        store
-                            .oidc_principal(&identity.issuer, &identity.subject, identity.scopes)
-                            .await
-                    }
-                    Err(error) => Err(error),
-                }
-            } else {
-                Err(DomainError::Unauthenticated)
-            }
-        }
-    };
+    let identity = bearer_identity(&store, mode, oidc.as_ref(), token).await;
+    if request.uri().path() == "/api/v1/dashboard/events" {
+        let stream_identity = StreamIdentity {
+            store: store.clone(),
+            mode,
+            oidc: oidc.clone(),
+            token: zeroize::Zeroizing::new(token.to_owned()),
+        };
+        request.extensions_mut().insert(stream_identity);
+    }
     match identity {
         Ok(actor) => {
             request.extensions_mut().insert(actor);
@@ -228,4 +218,44 @@ pub async fn boundary(
         .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
     tracing::info!(request_id = %id, %method, status = status.as_u16(), elapsed_ms = started.elapsed().as_millis(), "request completed");
     response
+}
+
+#[derive(Clone)]
+pub(crate) struct StreamIdentity {
+    store: crate::infrastructure::database::Store,
+    mode: crate::config::AuthMode,
+    oidc: Option<std::sync::Arc<crate::infrastructure::security::oidc::OidcVerifier>>,
+    token: zeroize::Zeroizing<String>,
+}
+impl StreamIdentity {
+    pub async fn verify(&self) -> Result<crate::modules::auth::Principal, DomainError> {
+        bearer_identity(&self.store, self.mode, self.oidc.as_ref(), &self.token).await
+    }
+}
+async fn bearer_identity(
+    store: &crate::infrastructure::database::Store,
+    mode: crate::config::AuthMode,
+    oidc: Option<&std::sync::Arc<crate::infrastructure::security::oidc::OidcVerifier>>,
+    token: &str,
+) -> Result<crate::modules::auth::Principal, DomainError> {
+    match mode {
+        crate::config::AuthMode::Disabled => Err(DomainError::Unauthenticated),
+        crate::config::AuthMode::Tokens => store.authenticate_local_token(token).await,
+        crate::config::AuthMode::Oidc => {
+            if token.starts_with("ht_") {
+                store.authenticate_token(token).await
+            } else if let Some(verifier) = oidc {
+                match verifier.verify(token).await {
+                    Ok(identity) => {
+                        store
+                            .oidc_principal(&identity.issuer, &identity.subject, identity.scopes)
+                            .await
+                    }
+                    Err(error) => Err(error),
+                }
+            } else {
+                Err(DomainError::Unauthenticated)
+            }
+        }
+    }
 }

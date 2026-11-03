@@ -28,8 +28,21 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: python3 scripts/docker_smoke.py
+  home-assistant:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.14'
+      - run: rustup toolchain install 1.99.1 --profile minimal
+      - run: cargo build --locked
+      - run: python -m pip install homeassistant==2026.10.2
+      - run: python -m unittest discover -s tests -p test_home_assistant.py -v
+        env:
+          HABIT_TRACKER_BIN: ${{ github.workspace }}/target/debug/habit-tracker
   build-and-push:
-    needs: [rust, container]
+    needs: [rust, container, home-assistant]
     if: >-
       github.event.repository.fork == false &&
       (github.event_name == 'workflow_dispatch' ||

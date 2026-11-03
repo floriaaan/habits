@@ -47,7 +47,7 @@ fn validate_key(key: &str) -> Result<(), DomainError> {
     }
 }
 
-async fn data(
+pub(super) async fn data(
     tx: &mut Transaction<'_, Sqlite>,
     user: UserId,
     id: Uuid,
@@ -414,78 +414,90 @@ impl Store {
             .begin_with("BEGIN IMMEDIATE")
             .await
             .map_err(persistence)?;
-        let row = sqlx::query("SELECT * FROM entries WHERE user_id = ? AND id = ?")
-            .bind(actor.user_id.0.to_string())
-            .bind(id.to_string())
-            .fetch_optional(&mut *tx)
-            .await
-            .map_err(persistence)?
-            .ok_or(DomainError::NotFound)?;
-        let mut entry = entry_from_row(&row)?;
-        let cancelled: Option<DateTime<Utc>> = row.try_get("cancelled_at").map_err(persistence)?;
-        let snapshot = input.clone().unwrap_or(NewEntry {
-            occurred_at: entry.occurred_at,
-            value: entry.value,
-        });
-        let payload = serde_json::to_string(&CheckInPayload {
-            habit_id: entry.habit_id,
-            entry: snapshot.clone(),
-        })
-        .map_err(persistence)?;
-        let operation = if input.is_some() { "correct" } else { "cancel" };
-        if let Some(previous)=sqlx::query("SELECT entry_id, operation, payload FROM entry_events WHERE user_id = ? AND idempotency_key = ?").bind(actor.user_id.0.to_string()).bind(key).fetch_optional(&mut *tx).await.map_err(persistence)?{
-            let previous_id:String=previous.try_get("entry_id").map_err(persistence)?;let previous_operation:String=previous.try_get("operation").map_err(persistence)?;let previous_payload:String=previous.try_get("payload").map_err(persistence)?;
-            if previous_id!=id.to_string()||previous_operation!=operation||(input.is_some()&&previous_payload!=payload){return Err(DomainError::Conflict);}tx.commit().await.map_err(persistence)?;return Ok(entry);
-        }
-        if cancelled.is_some() {
-            return Err(DomainError::Validation("entry is cancelled"));
-        }
-        if input.is_some() {
-            let mut habit = owned_habit(&mut tx, actor.user_id, entry.habit_id).await?;
-            let timezone = habit
-                .definition
-                .timezone
-                .parse::<chrono_tz::Tz>()
-                .map_err(persistence)?;
-            apply_version(
-                &mut tx,
-                &mut habit,
-                snapshot.occurred_at.with_timezone(&timezone).date_naive(),
-            )
-            .await?;
-            entry.local_date = snapshot.eligible_date(&habit)?;
-            let rest:bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM schedule_exceptions WHERE user_id = ? AND habit_id = ? AND local_date = ?)").bind(actor.user_id.0.to_string()).bind(entry.habit_id.to_string()).bind(entry.local_date).fetch_one(&mut *tx).await.map_err(persistence)?;
-            if rest {
-                return Err(DomainError::Validation("instant falls on a rest exception"));
-            }
-            entry.occurred_at = snapshot.occurred_at;
-            entry.value = snapshot.value;
-            sqlx::query("UPDATE entries SET occurred_at = ?, local_date = ?, value = ? WHERE user_id = ? AND id = ?").bind(entry.occurred_at).bind(entry.local_date).bind(entry.value).bind(actor.user_id.0.to_string()).bind(id.to_string()).execute(&mut *tx).await.map_err(persistence)?;
-        } else {
-            sqlx::query("UPDATE entries SET cancelled_at = ? WHERE user_id = ? AND id = ?")
-                .bind(Utc::now())
-                .bind(actor.user_id.0.to_string())
-                .bind(id.to_string())
-                .execute(&mut *tx)
-                .await
-                .map_err(persistence)?;
-        }
-        let event = append_event(
-            &mut tx,
-            actor.user_id,
-            entry.habit_id,
-            key,
-            if input.is_some() {
-                "entry.correct"
-            } else {
-                "entry.cancel"
-            },
-            &payload,
-        )
-        .await?;
-        sqlx::query("INSERT INTO entry_events (id, user_id, entry_id, idempotency_key, operation, payload, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)").bind(event.to_string()).bind(actor.user_id.0.to_string()).bind(id.to_string()).bind(key).bind(operation).bind(payload).bind(Utc::now()).execute(&mut *tx).await.map_err(persistence)?;
-        rebuild(&mut tx, actor.user_id, entry.habit_id, event).await?;
+        let entry = change_in_tx(&mut tx, actor.user_id, id, key, input).await?;
         tx.commit().await.map_err(persistence)?;
         Ok(entry)
     }
+}
+
+pub(super) async fn change_in_tx(
+    tx: &mut Transaction<'_, Sqlite>,
+    user: UserId,
+    id: Uuid,
+    key: &str,
+    input: Option<NewEntry>,
+) -> Result<Entry, DomainError> {
+    let row = sqlx::query("SELECT * FROM entries WHERE user_id = ? AND id = ?")
+        .bind(user.0.to_string())
+        .bind(id.to_string())
+        .fetch_optional(&mut **tx)
+        .await
+        .map_err(persistence)?
+        .ok_or(DomainError::NotFound)?;
+    let mut entry = entry_from_row(&row)?;
+    let cancelled: Option<DateTime<Utc>> = row.try_get("cancelled_at").map_err(persistence)?;
+    let snapshot = input.clone().unwrap_or(NewEntry {
+        occurred_at: entry.occurred_at,
+        value: entry.value,
+    });
+    let payload = serde_json::to_string(&CheckInPayload {
+        habit_id: entry.habit_id,
+        entry: snapshot.clone(),
+    })
+    .map_err(persistence)?;
+    let operation = if input.is_some() { "correct" } else { "cancel" };
+    if let Some(previous)=sqlx::query("SELECT entry_id, operation, payload FROM entry_events WHERE user_id = ? AND idempotency_key = ?").bind(user.0.to_string()).bind(key).fetch_optional(&mut **tx).await.map_err(persistence)?{
+            let previous_id:String=previous.try_get("entry_id").map_err(persistence)?;let previous_operation:String=previous.try_get("operation").map_err(persistence)?;let previous_payload:String=previous.try_get("payload").map_err(persistence)?;
+            if previous_id!=id.to_string()||previous_operation!=operation||(input.is_some()&&previous_payload!=payload){return Err(DomainError::Conflict);}return Ok(entry);
+        }
+    if cancelled.is_some() {
+        return Err(DomainError::Validation("entry is cancelled"));
+    }
+    if input.is_some() {
+        let mut habit = owned_habit(tx, user, entry.habit_id).await?;
+        let timezone = habit
+            .definition
+            .timezone
+            .parse::<chrono_tz::Tz>()
+            .map_err(persistence)?;
+        apply_version(
+            tx,
+            &mut habit,
+            snapshot.occurred_at.with_timezone(&timezone).date_naive(),
+        )
+        .await?;
+        entry.local_date = snapshot.eligible_date(&habit)?;
+        let rest:bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM schedule_exceptions WHERE user_id = ? AND habit_id = ? AND local_date = ?)").bind(user.0.to_string()).bind(entry.habit_id.to_string()).bind(entry.local_date).fetch_one(&mut **tx).await.map_err(persistence)?;
+        if rest {
+            return Err(DomainError::Validation("instant falls on a rest exception"));
+        }
+        entry.occurred_at = snapshot.occurred_at;
+        entry.value = snapshot.value;
+        sqlx::query("UPDATE entries SET occurred_at = ?, local_date = ?, value = ? WHERE user_id = ? AND id = ?").bind(entry.occurred_at).bind(entry.local_date).bind(entry.value).bind(user.0.to_string()).bind(id.to_string()).execute(&mut **tx).await.map_err(persistence)?;
+    } else {
+        sqlx::query("UPDATE entries SET cancelled_at = ? WHERE user_id = ? AND id = ?")
+            .bind(Utc::now())
+            .bind(user.0.to_string())
+            .bind(id.to_string())
+            .execute(&mut **tx)
+            .await
+            .map_err(persistence)?;
+    }
+    let event = append_event(
+        tx,
+        user,
+        entry.habit_id,
+        key,
+        if input.is_some() {
+            "entry.correct"
+        } else {
+            "entry.cancel"
+        },
+        &payload,
+    )
+    .await?;
+    sqlx::query("INSERT INTO entry_events (id, user_id, entry_id, idempotency_key, operation, payload, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)").bind(event.to_string()).bind(user.0.to_string()).bind(id.to_string()).bind(key).bind(operation).bind(payload).bind(Utc::now()).execute(&mut **tx).await.map_err(persistence)?;
+    rebuild(tx, user, entry.habit_id, event).await?;
+
+    Ok(entry)
 }

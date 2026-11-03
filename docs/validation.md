@@ -119,3 +119,51 @@ Vérifications relancées en Rust 1.99.1 sur macOS arm64 :
 `task dev:cargo -- fmt --all` a échoué faute de socket Docker/OrbStack disponible.
 Les vérifications ci-dessus ont donc été exécutées avec la toolchain locale ;
 le build et le smoke Docker n'ont pas été relancés pour cet ajout.
+
+## Dashboard et Home Assistant connecté — 2026-11-03
+
+Les sections précédentes décrivent leurs itérations respectives. Le dépôt privé
+GitHub existe désormais ; le résultat de publication distante du nouveau workflow
+n'est pas assimilé aux preuves locales ci-dessous.
+
+- `cargo fmt --all -- --check`, Clippy tous targets/features avec `-D warnings`,
+  `cargo test --locked --all-targets` : **61 tests réussis**, zéro échec/ignoré.
+  Build release natif macOS arm64 et build debug : succès.
+- Snapshot OpenAPI régénéré et comparaison avec la CLI : identique ; frontières
+  du domaine et `git diff --check` : succès. `actionlint` : succès.
+- Audit : 1403 advisories, 297 dépendances, aucun advisory signalé. Deny :
+  advisories/bans/licenses/sources OK ; avertissements de doublons transitifs
+  déjà revus dans dependencies.md, aucune nouvelle version transitive introduite.
+- Dashboard : jeu correspondant aux proportions de la capture (80 % arrondi),
+  pondérations, compteurs, 91 dates sans données fictives, repos, fuseaux,
+  isolation et validation. Actions concurrentes/rejouées, retrait à zéro, pas
+  fractionnaires, compensation XP, refus de retrait Strava et rollback si le
+  reçu échoue. Migration 0006 sur base vierge et upgrade depuis 0001 testés.
+- SSE HTTP réel : invalidation après écriture, aucune donnée d'un autre tenant,
+  fermeture après révocation et scopes requis. Rappels : aucune HA configurée,
+  heures DST absentes/doublées, repos, déduplication après reconnexion du
+  connecteur et reçus survivant à la purge des jobs.
+- **3 tests Python réussis sur Home Assistant 2026.10.2 réel et le binaire Rust**,
+  chacun avec SQLite/config HA temporaires : config flow, entités automatiques,
+  switches/actions +/- jusqu'à zéro, push externe et découverte dynamique,
+  révocation/réauthentification/rechargement/déchargement ; reprise de transport
+  conservant la clé, redirection sans transmission du token. Aucun mock du moteur
+  HA ; seul le résolveur DNS/mDNS est remplacé (endpoints loopback). Aucun accès
+  à une instance personnelle. Commandes exactes dans home-assistant-connected.md.
+- Copie d'installation dans une configuration temporaire : configuration et
+  autre intégration conservées, bytecode exclu. Task SSH testée via transport
+  local : deux cartes copiées, configuration conservée, fichiers temporaires
+  nettoyés. Aucun transfert réel vers le HA de l'opérateur.
+- Carte : syntaxe Node OK ; rendu headless desktop sombre 1600 px et mobile
+  clair 390 px, sans débordement. 91 cellules ; noms HTML échappés, erreur
+  d'action visible et état busy libéré, actions absentes si indisponible.
+  Le snapshot de 12 habitudes a été produit par la vraie API de test ; seuls
+  les conteneurs/icônes HA sont remplacés dans ce harnais de rendu.
+  Revue indépendante : les deux défauts relevés (verres et couleurs de groupe)
+  ont été notés résolus après recapture ; pas de certification HA implicite.
+
+Le navigateur collaboratif a renvoyé des timeouts/absence d'hôte ; le rendu a été
+vérifié avec le moteur headless T3. Docker/OrbStack était arrêté : smoke/build
+Docker non relancés pour cette itération. Le workflow les conserve, ajoute les
+tests HA et attend leurs résultats avant publication GHCR. La recette sur le
+homelab réel, son proxy et ses credentials reste une opération de déploiement.

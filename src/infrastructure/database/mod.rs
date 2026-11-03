@@ -14,8 +14,12 @@ use uuid::Uuid;
 
 pub static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("./migrations");
 mod auth;
+mod dashboard;
+#[cfg(test)]
+mod dashboard_tests;
 pub(crate) mod integrations;
 mod jobs;
+mod reminders;
 mod tracking;
 #[cfg(test)]
 mod tracking_tests;
@@ -23,6 +27,7 @@ mod tracking_tests;
 #[derive(Clone)]
 pub struct Store {
     pub(crate) pool: SqlitePool,
+    pub(crate) streams: std::sync::Arc<tokio::sync::Semaphore>,
 }
 
 impl Store {
@@ -42,7 +47,10 @@ impl Store {
             .run(&pool)
             .await
             .map_err(|error| sqlx::Error::Migrate(Box::new(error)))?;
-        Ok(Self { pool })
+        Ok(Self {
+            pool,
+            streams: std::sync::Arc::new(tokio::sync::Semaphore::new(16)),
+        })
     }
 
     pub async fn ready(&self) -> bool {
@@ -195,92 +203,14 @@ impl EntryRepository for Store {
         key: &str,
         input: NewEntry,
     ) -> Result<RecordedEntry, DomainError> {
-        // Reserve the writer before reading idempotency state: concurrent retries
-        // serialize and see the committed original rather than creating duplicates.
         let mut tx = self
             .pool
             .begin_with("BEGIN IMMEDIATE")
             .await
             .map_err(persistence)?;
-        let mut habit = owned_habit(&mut tx, user, habit_id).await?;
-        let payload = serde_json::to_string(&CheckInPayload {
-            habit_id,
-            entry: input.clone(),
-        })
-        .map_err(persistence)?;
-        if let Some(row) = sqlx::query(
-            "SELECT entry_id, operation, payload FROM entry_events WHERE user_id = ? AND idempotency_key = ?",
-        )
-        .bind(user.0.to_string())
-        .bind(key)
-        .fetch_optional(&mut *tx)
-        .await
-        .map_err(persistence)?
-        {
-            let previous: String = row.try_get("payload").map_err(persistence)?;
-            let operation: String = row.try_get("operation").map_err(persistence)?;
-            if previous != payload || operation != "create" {
-                return Err(DomainError::Conflict);
-            }
-            let id: String = row.try_get("entry_id").map_err(persistence)?;
-            let row = sqlx::query("SELECT * FROM entries WHERE user_id = ? AND id = ?")
-                .bind(user.0.to_string())
-                .bind(id)
-                .fetch_one(&mut *tx)
-                .await
-                .map_err(persistence)?;
-            let entry = entry_from_row(&row)?;
-            tx.commit().await.map_err(persistence)?;
-            return Ok(RecordedEntry {
-                entry,
-                created: false,
-            });
-        }
-        if habit.archived_at.is_some() {
-            return Err(DomainError::Validation("habit is archived"));
-        }
-        let timezone = habit
-            .definition
-            .timezone
-            .parse::<chrono_tz::Tz>()
-            .map_err(persistence)?;
-        tracking::apply_version(
-            &mut tx,
-            &mut habit,
-            input.occurred_at.with_timezone(&timezone).date_naive(),
-        )
-        .await?;
-        let local_date = input.eligible_date(&habit)?;
-        let rest: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM schedule_exceptions WHERE user_id = ? AND habit_id = ? AND local_date = ? AND kind = 'rest')")
-            .bind(user.0.to_string()).bind(habit_id.to_string()).bind(local_date)
-            .fetch_one(&mut *tx).await.map_err(persistence)?;
-        if rest {
-            return Err(DomainError::Validation("instant falls on a rest exception"));
-        }
-        let entry = Entry {
-            id: Uuid::new_v4(),
-            habit_id,
-            user_id: user,
-            occurred_at: input.occurred_at,
-            local_date,
-            value: input.value,
-            created_at: Utc::now(),
-        };
-        sqlx::query("INSERT INTO entries (id, user_id, habit_id, occurred_at, local_date, value, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
-            .bind(entry.id.to_string()).bind(user.0.to_string()).bind(habit_id.to_string())
-            .bind(entry.occurred_at).bind(entry.local_date).bind(entry.value).bind(entry.created_at)
-            .execute(&mut *tx).await.map_err(persistence)?;
-        let event =
-            tracking::append_event(&mut tx, user, habit_id, key, "entry.create", &payload).await?;
-        sqlx::query("INSERT INTO entry_events (id, user_id, entry_id, idempotency_key, operation, payload, created_at) VALUES (?, ?, ?, ?, 'create', ?, ?)")
-            .bind(event.to_string()).bind(user.0.to_string()).bind(entry.id.to_string())
-            .bind(key).bind(payload).bind(entry.created_at).execute(&mut *tx).await.map_err(persistence)?;
-        tracking::rebuild(&mut tx, user, habit_id, event).await?;
+        let recorded = record_in_tx(&mut tx, user, habit_id, key, input).await?;
         tx.commit().await.map_err(persistence)?;
-        Ok(RecordedEntry {
-            entry,
-            created: true,
-        })
+        Ok(recorded)
     }
 
     async fn get(&self, user: UserId, id: Uuid) -> Result<Entry, DomainError> {
@@ -315,3 +245,88 @@ impl EntryRepository for Store {
 
 #[cfg(test)]
 pub(crate) mod tests;
+
+pub(super) async fn record_in_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+    user: UserId,
+    habit_id: Uuid,
+    key: &str,
+    input: NewEntry,
+) -> Result<RecordedEntry, DomainError> {
+    let mut habit = owned_habit(tx, user, habit_id).await?;
+    let payload = serde_json::to_string(&CheckInPayload {
+        habit_id,
+        entry: input.clone(),
+    })
+    .map_err(persistence)?;
+    if let Some(row) = sqlx::query(
+            "SELECT entry_id, operation, payload FROM entry_events WHERE user_id = ? AND idempotency_key = ?",
+        )
+        .bind(user.0.to_string())
+        .bind(key)
+        .fetch_optional(&mut **tx)
+        .await
+        .map_err(persistence)?
+        {
+            let previous: String = row.try_get("payload").map_err(persistence)?;
+            let operation: String = row.try_get("operation").map_err(persistence)?;
+            if previous != payload || operation != "create" {
+                return Err(DomainError::Conflict);
+            }
+            let id: String = row.try_get("entry_id").map_err(persistence)?;
+            let row = sqlx::query("SELECT * FROM entries WHERE user_id = ? AND id = ?")
+                .bind(user.0.to_string())
+                .bind(id)
+                .fetch_one(&mut **tx)
+                .await
+                .map_err(persistence)?;
+            let entry = entry_from_row(&row)?;
+                return Ok(RecordedEntry {
+                entry,
+                created: false,
+            });
+        }
+    if habit.archived_at.is_some() {
+        return Err(DomainError::Validation("habit is archived"));
+    }
+    let timezone = habit
+        .definition
+        .timezone
+        .parse::<chrono_tz::Tz>()
+        .map_err(persistence)?;
+    tracking::apply_version(
+        tx,
+        &mut habit,
+        input.occurred_at.with_timezone(&timezone).date_naive(),
+    )
+    .await?;
+    let local_date = input.eligible_date(&habit)?;
+    let rest: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM schedule_exceptions WHERE user_id = ? AND habit_id = ? AND local_date = ? AND kind = 'rest')")
+            .bind(user.0.to_string()).bind(habit_id.to_string()).bind(local_date)
+            .fetch_one(&mut **tx).await.map_err(persistence)?;
+    if rest {
+        return Err(DomainError::Validation("instant falls on a rest exception"));
+    }
+    let entry = Entry {
+        id: Uuid::new_v4(),
+        habit_id,
+        user_id: user,
+        occurred_at: input.occurred_at,
+        local_date,
+        value: input.value,
+        created_at: Utc::now(),
+    };
+    sqlx::query("INSERT INTO entries (id, user_id, habit_id, occurred_at, local_date, value, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
+            .bind(entry.id.to_string()).bind(user.0.to_string()).bind(habit_id.to_string())
+            .bind(entry.occurred_at).bind(entry.local_date).bind(entry.value).bind(entry.created_at)
+            .execute(&mut **tx).await.map_err(persistence)?;
+    let event = tracking::append_event(tx, user, habit_id, key, "entry.create", &payload).await?;
+    sqlx::query("INSERT INTO entry_events (id, user_id, entry_id, idempotency_key, operation, payload, created_at) VALUES (?, ?, ?, ?, 'create', ?, ?)")
+            .bind(event.to_string()).bind(user.0.to_string()).bind(entry.id.to_string())
+            .bind(key).bind(payload).bind(entry.created_at).execute(&mut **tx).await.map_err(persistence)?;
+    tracking::rebuild(tx, user, habit_id, event).await?;
+    Ok(RecordedEntry {
+        entry,
+        created: true,
+    })
+}

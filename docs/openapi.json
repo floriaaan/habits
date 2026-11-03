@@ -41,6 +41,109 @@
         ]
       }
     },
+    "/api/v1/dashboard": {
+      "get": {
+        "tags": [
+          "super::dashboard"
+        ],
+        "operationId": "snapshot",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Dashboard"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/dashboard/events": {
+      "get": {
+        "tags": [
+          "super::dashboard"
+        ],
+        "operationId": "events",
+        "responses": {
+          "200": {
+            "description": "SSE invalidation; authenticated header, reconnect and GET dashboard",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/entries/{entry_id}": {
       "get": {
         "tags": [],
@@ -751,6 +854,104 @@
         ]
       }
     },
+    "/api/v1/habits/{habit_id}/actions": {
+      "post": {
+        "tags": [
+          "super::dashboard"
+        ],
+        "operationId": "action",
+        "parameters": [
+          {
+            "name": "habit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActionReceipt"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/habits/{habit_id}/entries": {
       "get": {
         "tags": [],
@@ -1140,6 +1341,87 @@
             }
           },
           "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/habits/{habit_id}/presentation": {
+      "put": {
+        "tags": [
+          "super::dashboard"
+        ],
+        "operationId": "presentation",
+        "parameters": [
+          {
+            "name": "habit_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Presentation"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Presentation"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          },
+          "422": {
             "content": {
               "application/json": {
                 "schema": {
@@ -2458,6 +2740,49 @@
   },
   "components": {
     "schemas": {
+      "ActionReceipt": {
+        "type": "object",
+        "required": [
+          "id",
+          "habit_id",
+          "action",
+          "local_date",
+          "progress"
+        ],
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/HabitAction"
+          },
+          "habit_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "local_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "progress": {
+            "type": "number",
+            "format": "double"
+          }
+        }
+      },
+      "ActionRequest": {
+        "type": "object",
+        "required": [
+          "action"
+        ],
+        "properties": {
+          "action": {
+            "$ref": "#/components/schemas/HabitAction"
+          }
+        },
+        "additionalProperties": false
+      },
       "Authorization": {
         "type": "object",
         "required": [
@@ -2481,6 +2806,149 @@
           }
         },
         "additionalProperties": false
+      },
+      "Dashboard": {
+        "type": "object",
+        "required": [
+          "user_id",
+          "generated_at",
+          "date",
+          "timezone",
+          "revision",
+          "groups",
+          "weekly",
+          "heatmap",
+          "gamification",
+          "streak_91_days"
+        ],
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "gamification": {
+            "$ref": "#/components/schemas/Gamification"
+          },
+          "generated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "global_percent": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "groups": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Group"
+            }
+          },
+          "heatmap": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardDay"
+            }
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "streak_91_days": {
+            "$ref": "#/components/schemas/Streak"
+          },
+          "timezone": {
+            "type": "string"
+          },
+          "user_id": {
+            "$ref": "#/components/schemas/UserId"
+          },
+          "weekly": {
+            "$ref": "#/components/schemas/WeekComparison"
+          }
+        }
+      },
+      "DashboardDay": {
+        "type": "object",
+        "required": [
+          "date",
+          "completed",
+          "eligible"
+        ],
+        "properties": {
+          "completed": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "eligible": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "percent": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "DashboardHabit": {
+        "type": "object",
+        "required": [
+          "habit",
+          "presentation",
+          "local_date",
+          "eligible",
+          "actionable",
+          "progress",
+          "target",
+          "completed"
+        ],
+        "properties": {
+          "actionable": {
+            "type": "boolean"
+          },
+          "completed": {
+            "type": "boolean"
+          },
+          "eligible": {
+            "type": "boolean"
+          },
+          "habit": {
+            "$ref": "#/components/schemas/Habit"
+          },
+          "local_date": {
+            "type": "string",
+            "format": "date"
+          },
+          "percent": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "presentation": {
+            "$ref": "#/components/schemas/Presentation"
+          },
+          "progress": {
+            "type": "number",
+            "format": "double"
+          },
+          "target": {
+            "type": "number",
+            "format": "double"
+          }
+        }
       },
       "DayResult": {
         "type": "object",
@@ -2634,6 +3102,43 @@
           }
         }
       },
+      "Group": {
+        "type": "object",
+        "required": [
+          "category",
+          "completed",
+          "eligible",
+          "habits"
+        ],
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/HabitCategory"
+          },
+          "completed": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "eligible": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "habits": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardHabit"
+            }
+          },
+          "percent": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          }
+        }
+      },
       "Habit": {
         "allOf": [
           {
@@ -2667,6 +3172,15 @@
               }
             }
           }
+        ]
+      },
+      "HabitAction": {
+        "type": "string",
+        "enum": [
+          "complete",
+          "uncomplete",
+          "increment",
+          "decrement"
         ]
       },
       "HabitCategory": {
@@ -2787,6 +3301,14 @@
             "type": "string"
           }
         }
+      },
+      "Illustration": {
+        "type": "string",
+        "enum": [
+          "plain",
+          "water",
+          "portions"
+        ]
       },
       "IntegrationInfo": {
         "type": "object",
@@ -3049,6 +3571,52 @@
           }
         }
       },
+      "Presentation": {
+        "type": "object",
+        "properties": {
+          "color": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null
+          },
+          "icon": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null
+          },
+          "illustration": {
+            "$ref": "#/components/schemas/Illustration",
+            "default": "plain"
+          },
+          "order": {
+            "type": "integer",
+            "format": "int32",
+            "default": 0
+          },
+          "reminder_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "default": null
+          },
+          "step": {
+            "type": "number",
+            "format": "double",
+            "default": 1.0
+          },
+          "weight": {
+            "type": "number",
+            "format": "double",
+            "default": 1.0
+          }
+        },
+        "additionalProperties": false
+      },
       "Provider": {
         "type": "string",
         "enum": [
@@ -3302,6 +3870,55 @@
             "format": "int64"
           },
           "updates": {}
+        }
+      },
+      "WeekComparison": {
+        "type": "object",
+        "required": [
+          "current",
+          "previous"
+        ],
+        "properties": {
+          "current": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardDay"
+            }
+          },
+          "current_percent": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "current_success_percent": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "previous": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DashboardDay"
+            }
+          },
+          "previous_percent": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          },
+          "previous_success_percent": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "format": "double"
+          }
         }
       },
       "WindowStatistics": {

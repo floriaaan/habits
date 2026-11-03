@@ -283,7 +283,12 @@ impl IntegrationRuntime {
                 }
                 Ok(())
             }
-            "ha.notify" => {
+            "ha.notify" | "ha.reminder" => {
+                if job.kind == "ha.reminder"
+                    && !self.store.reminder_still_due(job, Utc::now()).await?
+                {
+                    return Ok(());
+                }
                 let base = self
                     .ha_url
                     .as_ref()
@@ -427,7 +432,14 @@ impl IntegrationRuntime {
         Ok(refreshed)
     }
     pub async fn worker(self: Arc<Self>) {
+        let mut reminders_checked = std::time::Instant::now() - Duration::from_secs(60);
         loop {
+            if self.ha_url.is_some() && reminders_checked.elapsed() >= Duration::from_secs(60) {
+                if self.store.enqueue_reminders_at(Utc::now()).await.is_err() {
+                    tracing::error!(category = "reminders", "reminder scheduling failed");
+                }
+                reminders_checked = std::time::Instant::now();
+            }
             match self.store.claim_job().await {
                 Ok(Some(job)) => {
                     let result = self.execute(&job).await;

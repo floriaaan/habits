@@ -56,8 +56,11 @@ des fichiers de configuration publiés.
 `notifications:write`, un `Idempotency-Key` de 1–128 caractères ASCII visibles et
 `{"title":"…","message":"…"}` (120/4096 octets maximum). La réponse 202 contient
 `job_id`. Le worker appelle `persistent_notification.create`, `notification_id`
-égal au job pour stabiliser les retries. Autres services/mobile push et carte
-connectée à l'API restent à implémenter. Un token HA invalide fait échouer le job.
+égal au job pour stabiliser les retries. Autres services/mobile push restent à
+implémenter. Un token HA invalide fait échouer le job.
+Les [cartes et l'intégration connectées](home-assistant-connected.md) utilisent le
+dashboard/SSE et les actions de réalisation. `presentation.reminder_at` active les
+rappels automatiques du worker via ces mêmes notifications persistantes.
 Le [prototype Lovelace du laboratoire](home-assistant-ui.md) est importé séparément
 dans `integrations/home-assistant/`, avec ses helpers et statistiques fictives.
 

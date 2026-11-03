@@ -10,10 +10,13 @@ statistiques 7/30/90 jours, heatmap, streaks et XP compensables.
 Pocket ID/OIDC, Strava et Home Assistant sont facultatifs. Leurs adaptateurs sont
 testés hors ligne ; leur validation avec des comptes réels reste à effectuer.
 
-Le [prototype Lovelace Home Assistant](docs/home-assistant-ui.md) est conservé
-dans `integrations/home-assistant/` : custom card, dashboard et helpers du
-laboratoire. Il utilise encore des helpers et des statistiques fictives ; son
-raccordement à l'API reste à réaliser. Il n'est pas compilé avec Rust.
+L'[intégration Home Assistant connectée](docs/home-assistant-connected.md) fournit
+entités automatiques, carte, anneaux, actions et mises à jour en direct. Installer
+avec `task ha:install HA_CONFIG_DIR=/chemin/config-ha`, puis redémarrer HA et
+configurer URL/token dans l'intégration. Le
+[prototype de laboratoire](docs/home-assistant-ui.md), avec ses helpers et ses
+statistiques fictives, est conservé séparément. Les cartes ne sont pas compilées
+avec Rust.
 Pour répercuter les changements de carte dans HA, utiliser
 `task --watch ha:sync HA_WWW_DIR="/chemin/vers/config/www/habit-tracker"`
 avec le dossier HA monté sur le poste de développement, puis recharger la page HA.
@@ -102,7 +105,7 @@ src/
 │   ├── security/{mod,cipher,oidc}.rs
 │   └── integrations.rs
 └── http/{routes,middleware,auth,tracking,integrations}.rs
-migrations/000{1_initial,2_auth,3_events_projections,4_integrations_jobs,5_habit_categories}.sql
+migrations/000{1_initial,2_auth,3_events_projections,4_integrations_jobs,5_habit_categories,6_dashboard}.sql
 integrations/home-assistant/{cards/,lovelace/,docs/}
 tests/fixtures/    scripts/    docs/    .github/workflows/ci.yml
 ```
@@ -119,9 +122,11 @@ Healthchecks internes sans token : `GET /health/live` et `/health/ready`.
 | Routes privées | Fonction |
 |---|---|
 | `GET /api/v1`, `/api/v1/openapi.json` | Version et contrat |
+| `GET /api/v1/dashboard` ; `GET /api/v1/dashboard/events` | Dashboard complet et invalidations SSE authentifiées |
 | `GET/POST /api/v1/habits` | Liste/création |
 | `GET/PUT/DELETE /api/v1/habits/{id}` | Lecture, définition future, archivage |
 | `GET /api/v1/habits/{id}/versions` | Historique des définitions |
+| `PUT …/habits/{id}/presentation` ; `POST …/habits/{id}/actions` | Icône/couleur/ordre/poids/pas/rappel et actions HA idempotentes |
 | `GET /api/v1/habits/{id}/exceptions` ; `PUT/DELETE …/exceptions/{date}` | Repos |
 | `POST/GET /api/v1/habits/{id}/entries` | Réalisation/liste |
 | `GET/PUT/DELETE /api/v1/entries/{id}` | Lecture, correction, annulation |
@@ -162,9 +167,17 @@ complète envoyée par PUT. Une modification prend effet à la date future de la
 version, sans effet sur les XP. Les anciennes habitudes reçoivent `daily`.
 Voir les [décisions et précautions de migration](docs/decisions-habit-categories.md).
 
+Le dashboard compose les catégories, anneaux pondérés, compteurs, comparaison des
+semaines et 91 jours d'historique. Une intégration HA installable crée les entités,
+relie les actions aux événements et reçoit les changements par SSE. Métadonnées
+et rappels automatiques sont configurables par habitude :
+[installation et contrat HA connecté](docs/home-assistant-connected.md).
+Les rappels exigent le connecteur sortant HA ; la lecture et les actions restent
+indépendantes de ce connecteur.
+
 ## Migrations et stockage
 
-SQLx applique automatiquement les cinq migrations et vérifie leurs checksums :
+SQLx applique automatiquement les six migrations et vérifie leurs checksums :
 
 1. `0001_initial.sql` : tables tenant-scoped, identités, habitudes, schedules,
    exceptions, entrées/événements, sources, intégrations, jobs, tokens et ledger.
@@ -175,6 +188,8 @@ SQLx applique automatiquement les cinq migrations et vérifie leurs checksums :
    credentials, states OAuth hashés, mappings et compteurs de quotas.
 5. `0005_habit_categories.sql` : catégorie `daily` pour les définitions et versions
    existantes sans catégorie ; événements, entrées et ledger conservés.
+6. `0006_dashboard.sql` : présentation, reçus d'actions, révisions transactionnelles
+   et déduplication des rappels ; aucune modification des réalisations historiques.
 
 WAL, FK activées, synchronous=FULL, busy_timeout 5 s ; FK composites et index
 uniques assurent isolation et idempotence. Réalisation/événements/projections/XP

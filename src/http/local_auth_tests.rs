@@ -64,6 +64,182 @@ async fn call(
 }
 
 #[tokio::test]
+async fn dashboard_actions_and_sse_enforce_auth_scopes_and_revocation() {
+    let fixture = Fixture::new().await;
+    let foreign = fixture.habit().await;
+    let admin = fixture.store.bootstrap_local("UTC").await.unwrap();
+    let app = router_with_auth(fixture.store.clone(), AuthMode::Tokens);
+    assert_eq!(
+        call(&app, "GET", "/api/v1/dashboard", None, None, None)
+            .await
+            .0,
+        StatusCode::UNAUTHORIZED
+    );
+    let (status, created) = call(
+        &app,
+        "POST",
+        "/api/v1/habits",
+        Some(&admin.token),
+        Some(serde_json::to_value(habit_input()).unwrap()),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+    let id = created["id"].as_str().unwrap();
+    let actions = format!("/api/v1/habits/{id}/actions");
+    assert_eq!(
+        call(
+            &app,
+            "POST",
+            &actions,
+            Some(&admin.token),
+            Some(json!({"action":"increment"})),
+            None
+        )
+        .await
+        .0,
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+    assert_eq!(
+        call(
+            &app,
+            "PUT",
+            &format!("/api/v1/habits/{}/presentation", foreign.id),
+            Some(&admin.token),
+            Some(json!({"step":250})),
+            None
+        )
+        .await
+        .0,
+        StatusCode::NOT_FOUND
+    );
+    let mut response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/dashboard/events")
+                .header("authorization", format!("Bearer {}", admin.token))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(response.headers()["x-accel-buffering"], "no");
+    let first = tokio::time::timeout(
+        std::time::Duration::from_secs(3),
+        response.body_mut().frame(),
+    )
+    .await
+    .unwrap()
+    .unwrap()
+    .unwrap()
+    .into_data()
+    .unwrap();
+    assert!(
+        std::str::from_utf8(&first)
+            .unwrap()
+            .contains("event: invalidate")
+    );
+    assert!(!std::str::from_utf8(&first).unwrap().contains(id));
+    assert_eq!(
+        call(
+            &app,
+            "POST",
+            &actions,
+            Some(&admin.token),
+            Some(json!({"action":"increment"})),
+            Some("sse-action")
+        )
+        .await
+        .0,
+        StatusCode::OK
+    );
+    let next = tokio::time::timeout(
+        std::time::Duration::from_secs(3),
+        response.body_mut().frame(),
+    )
+    .await
+    .unwrap()
+    .unwrap()
+    .unwrap()
+    .into_data()
+    .unwrap();
+    assert_ne!(first, next);
+    let (_, dashboard) = call(
+        &app,
+        "GET",
+        "/api/v1/dashboard",
+        Some(&admin.token),
+        None,
+        None,
+    )
+    .await;
+    assert_eq!(dashboard["groups"][0]["habits"][0]["progress"], 1.0);
+    assert!(!dashboard.to_string().contains(&foreign.id.to_string()));
+    assert_eq!(
+        call(
+            &app,
+            "DELETE",
+            &format!("/api/v1/tokens/{}", admin.metadata.id),
+            Some(&admin.token),
+            None,
+            None
+        )
+        .await
+        .0,
+        StatusCode::NO_CONTENT
+    );
+    assert!(
+        tokio::time::timeout(
+            std::time::Duration::from_secs(3),
+            response.body_mut().frame()
+        )
+        .await
+        .unwrap()
+        .is_none()
+    );
+    let readonly = fixture
+        .store
+        .issue_local_token(
+            admin.metadata.user_id,
+            NewToken {
+                scopes: vec![Scope::HabitsRead],
+                expires_at: Utc::now() + Duration::hours(1),
+                service_account_id: None,
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        call(
+            &app,
+            "GET",
+            "/api/v1/dashboard",
+            Some(&readonly.token),
+            None,
+            None
+        )
+        .await
+        .0,
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        call(
+            &app,
+            "POST",
+            &actions,
+            Some(&readonly.token),
+            Some(json!({"action":"increment"})),
+            Some("readonly-action")
+        )
+        .await
+        .0,
+        StatusCode::FORBIDDEN
+    );
+}
+
+#[tokio::test]
 async fn habit_categories_round_trip_with_local_auth_and_legacy_default() {
     let fixture = Fixture::new().await;
     let foreign = fixture.habit().await;

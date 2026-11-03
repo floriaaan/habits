@@ -1,4 +1,5 @@
 mod auth;
+mod dashboard;
 mod integrations;
 #[cfg(test)]
 mod local_auth_tests;

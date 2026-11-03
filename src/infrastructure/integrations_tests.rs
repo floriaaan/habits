@@ -47,6 +47,128 @@ fn credentials() -> Credentials {
     }
 }
 
+#[tokio::test]
+async fn reminder_scheduler_handles_dst_replay_rests_and_disabled_delivery() {
+    use crate::modules::habits::presentation::Presentation;
+    let fixture = Fixture::new().await;
+    let alice = actor(1);
+    let habit = fixture.habit().await;
+    sqlx::query("UPDATE habits SET created_at = '2026-01-01T00:00:00Z' WHERE id = ?")
+        .bind(habit.id.to_string())
+        .execute(&fixture.store.pool)
+        .await
+        .unwrap();
+    fixture
+        .store
+        .set_presentation(
+            &alice,
+            habit.id,
+            Presentation {
+                reminder_at: Some("02:30:00".parse().unwrap()),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+    let first = "2026-10-25T00:30:00Z".parse().unwrap();
+    assert_eq!(fixture.store.enqueue_reminders_at(first).await.unwrap(), 0);
+    fixture
+        .store
+        .connect_integration(
+            alice.user_id,
+            "home_assistant",
+            "fixture-ha",
+            &credentials(),
+            &cipher(),
+            1,
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        fixture
+            .store
+            .enqueue_reminders_at("2026-10-25T00:29:00Z".parse().unwrap())
+            .await
+            .unwrap(),
+        0
+    );
+    assert_eq!(fixture.store.enqueue_reminders_at(first).await.unwrap(), 1);
+    assert_eq!(
+        fixture
+            .store
+            .enqueue_reminders_at("2026-10-25T01:30:00Z".parse().unwrap())
+            .await
+            .unwrap(),
+        0
+    );
+    let job = fixture.store.claim_job().await.unwrap().unwrap();
+    assert_eq!(job.kind, "ha.reminder");
+    assert!(fixture.store.reminder_still_due(&job, first).await.unwrap());
+    fixture
+        .store
+        .set_rest(&alice, habit.id, "2026-10-25".parse().unwrap(), true)
+        .await
+        .unwrap();
+    assert!(!fixture.store.reminder_still_due(&job, first).await.unwrap());
+    assert!(
+        !fixture
+            .store
+            .reminder_still_due(&job, first + Duration::days(1))
+            .await
+            .unwrap()
+    );
+    // 02:30 does not exist on this date: send at the first later local time.
+    assert_eq!(
+        fixture
+            .store
+            .enqueue_reminders_at("2026-03-29T01:00:00Z".parse().unwrap())
+            .await
+            .unwrap(),
+        1
+    );
+    let integration = fixture
+        .store
+        .integration_id(alice.user_id, "home_assistant")
+        .await
+        .unwrap();
+    fixture
+        .store
+        .disconnect_integration(alice.user_id, integration)
+        .await
+        .unwrap();
+    fixture
+        .store
+        .connect_integration(
+            alice.user_id,
+            "home_assistant",
+            "fixture-ha",
+            &credentials(),
+            &cipher(),
+            1,
+        )
+        .await
+        .unwrap();
+    fixture
+        .store
+        .set_rest(&alice, habit.id, "2026-10-25".parse().unwrap(), false)
+        .await
+        .unwrap();
+    assert_eq!(fixture.store.enqueue_reminders_at(first).await.unwrap(), 0);
+    fixture
+        .store
+        .set_presentation(&alice, habit.id, Presentation::default())
+        .await
+        .unwrap();
+    assert_eq!(
+        fixture
+            .store
+            .enqueue_reminders_at("2026-03-30T03:00:00Z".parse().unwrap())
+            .await
+            .unwrap(),
+        0
+    );
+}
+
 #[derive(Clone)]
 struct MockHa {
     status: Arc<AtomicU16>,

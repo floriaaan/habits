@@ -57,3 +57,10 @@ Images vérifiées par pull le 2026-11-02 et fixées par digest dans Dockerfile 
 `rust:1.99.1-bookworm` et `debian:bookworm-slim`. Action CI checkout : version
 stable v7.0.1 vérifiée via l'API GitHub officielle, fixée au commit
 `3d3c42e5aac5ba805825da76410c181273ba90b1`.
+## Ajout du 2026-11-03
+
+`tokio-stream = 0.1.19`, déjà présent transitivement dans Cargo.lock, est désormais
+une dépendance directe pour adapter le canal Tokio du SSE. Version vérifiée dans
+la [documentation publiée](https://docs.rs/tokio-stream/0.1.19/tokio_stream/) et le
+manifest de la crate (MSRV 1.71, compatible avec Rust 1.99.1). Aucune autre version
+transitive modifiée ; audit/deny et compilations exécutés, voir validation.md.

@@ -8,6 +8,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use utoipa::ToSchema;
 
+pub mod dashboard;
+
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
 pub struct PeriodResult {
     pub start: NaiveDate,

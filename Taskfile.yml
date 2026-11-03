@@ -57,6 +57,7 @@ tasks:
       HA_SYNC_DEST: '{{.HA_WWW_DIR}}'
     sources:
       - integrations/home-assistant/cards/habit-lab-visual-card.js
+      - integrations/home-assistant/cards/habit-tracker-card.js
     # Copier aussi au premier lancement ou si la destination change.
     status: ['false']
     preconditions:
@@ -64,18 +65,30 @@ tasks:
         msg: HA_WWW_DIR doit être un dossier existant correspondant à config/www/habit-tracker.
     cmds:
       - cp integrations/home-assistant/cards/habit-lab-visual-card.js "$HA_SYNC_DEST/habit-lab-visual-card.js"
+      - cp integrations/home-assistant/cards/habit-tracker-card.js "$HA_SYNC_DEST/habit-tracker-card.js"
+
+  ha:install:
+    desc: Copie l'intégration et les cartes dans un dossier de configuration HA monté
+    requires:
+      vars: [HA_CONFIG_DIR]
+    env:
+      HA_INSTALL_DEST: '{{.HA_CONFIG_DIR}}'
+    cmds:
+      - python3 scripts/install_home_assistant.py "$HA_INSTALL_DEST"
 
   ha:sync:ssh:
-    desc: Synchronise la carte par SSH (task --watch ha:sync:ssh HA_SSH_HOST=alias-ssh)
+    desc: Synchronise les deux cartes par SSH (task --watch ha:sync:ssh HA_SSH_HOST=alias-ssh)
     requires:
       vars: [HA_SSH_HOST]
     env:
       HA_SSH_TARGET: '{{.HA_SSH_HOST}}'
     sources:
       - integrations/home-assistant/cards/habit-lab-visual-card.js
+      - integrations/home-assistant/cards/habit-tracker-card.js
     status: ['false']
     cmds:
       - |
+        tar -C integrations/home-assistant/cards -cf - habit-lab-visual-card.js habit-tracker-card.js |
         ssh -- "$HA_SSH_TARGET" '
           set -eu
           if test -f /homeassistant/configuration.yaml; then
@@ -88,12 +101,14 @@ tasks:
           fi
           ha_card_dir="$ha_config_dir/www/habit-tracker"
           mkdir -p "$ha_card_dir"
-          ha_card_tmp=$(mktemp "$ha_card_dir/.habit-lab-visual-card.XXXXXX")
-          trap '\''rm -f "$ha_card_tmp"'\'' EXIT
-          cat > "$ha_card_tmp"
-          chmod 644 "$ha_card_tmp"
-          mv -f "$ha_card_tmp" "$ha_card_dir/habit-lab-visual-card.js"
-        ' < integrations/home-assistant/cards/habit-lab-visual-card.js
+          ha_card_tmp=$(mktemp -d "$ha_card_dir/.cards.XXXXXX")
+          trap '\''rm -f "$ha_card_tmp/habit-lab-visual-card.js" "$ha_card_tmp/habit-tracker-card.js"; rmdir "$ha_card_tmp"'\'' EXIT
+          tar -xf - -C "$ha_card_tmp"
+          for ha_card_name in habit-lab-visual-card.js habit-tracker-card.js; do
+            chmod 644 "$ha_card_tmp/$ha_card_name"
+            mv -f "$ha_card_tmp/$ha_card_name" "$ha_card_dir/$ha_card_name"
+          done
+        '
 
   dev:prepare:
     internal: true
