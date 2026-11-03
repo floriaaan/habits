@@ -195,10 +195,11 @@ pub async fn boundary(
         .map(|p| p.as_str())
         .unwrap_or("unmatched")
         .to_owned();
+    let healthcheck = matches!(route.as_str(), "/health/live" | "/health/ready");
     let span = tracing::info_span!("http.request", request_id=%id, %method, %route, user_id=tracing::field::Empty);
     async move {
     let started = Instant::now();
-    tracing::info!("request started");
+    if !healthcheck { tracing::info!("request started"); }
     let mut response = match budget.admit() {
         Err(error) => error.into_response(),
         Ok(()) => match tokio::time::timeout(Duration::from_secs(10), next.run(request)).await {
@@ -234,7 +235,7 @@ pub async fn boundary(
     response
         .headers_mut()
         .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
-    tracing::info!(request_id = %id, %method, status = status.as_u16(), elapsed_ms = started.elapsed().as_millis(), "request completed");
+    if !healthcheck { tracing::info!(request_id = %id, %method, status = status.as_u16(), elapsed_ms = started.elapsed().as_millis(), "request completed"); }
     response
     }.instrument(span).await
 }

@@ -48,7 +48,9 @@ Le span `http.request` associe ce request ID, méthode, template de route Axum e
 UUID du tenant authentifié. Début, use cases, erreurs et fin de requête héritent
 de ce contexte. La fin donne statut et durée en millisecondes ; pour SSE, elle
 correspond à la remise de la réponse au serveur HTTP, pas à la fermeture du flux.
-Les jobs portent leur propre identifiant, type, tentative et issue/retry.
+Les healthchecks réussis (`/health/live`, `/health/ready`) n’émettent aucun log
+de début/fin ni export OTLP ; leurs erreurs restent journalisées. Les jobs
+portent leur propre identifiant, type, tentative et issue/retry.
 
 Les opérations couvrent habitudes, entrées/corrections, statistiques et XP,
 présentations/actions dashboard, création idempotente, tokens/comptes de service,

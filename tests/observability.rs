@@ -85,6 +85,15 @@ async fn otlp_correlates_request_service_response_redacts_secrets_and_survives_o
         tokio::time::sleep(Duration::from_millis(50)).await;
     }
     assert!(ready, "API startup failed");
+    assert!(
+        client
+            .get(format!("{url}/health/live"))
+            .send()
+            .await
+            .unwrap()
+            .status()
+            .is_success()
+    );
     let output = std::fs::read_to_string(directory.path().join("server.log")).unwrap();
     let bootstrap: Value = output
         .lines()
@@ -163,6 +172,10 @@ async fn otlp_correlates_request_service_response_redacts_secrets_and_survives_o
     }
 
     assert!(exported.contains("/api/v1/habits/{habit_id}"));
+    assert!(
+        !exported.contains("/health/"),
+        "successful probes must not be exported"
+    );
     for secret in [
         token,
         "PRIVATE_HABIT_NAME",
@@ -220,6 +233,10 @@ async fn otlp_correlates_request_service_response_redacts_secrets_and_survives_o
         .collect::<Vec<_>>()
         .join("\n");
     assert!(normal_logs.contains(&request_id));
+    assert!(
+        !normal_logs.contains("/health/"),
+        "successful probes must not be logged"
+    );
     for secret in [
         token,
         "PRIVATE_HABIT_NAME",
