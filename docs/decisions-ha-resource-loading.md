@@ -18,7 +18,8 @@
   un avertissement avec l'URL à déclarer sous `lovelace.resources` en type module.
   Documenter la différence et le contournement de la version 0.1.1.
 - Livrer en version HACS 0.1.2 avec tests sur HA réel : première installation,
-  ressource ancienne/manuelle, relance sans doublon et ressources YAML intactes.
+  ressource ancienne/manuelle, rechargement de l'intégration sans doublon et
+  ressources YAML intactes.
   La montée de version invalide le cache URL. Le retour à 0.1.1 exige de retirer
   la ressource versionnée 0.1.2 et d'enregistrer la route 0.1.1 ou de revenir au
   mécanisme extra JS ; aucun fichier SQLite métier n'est migré.

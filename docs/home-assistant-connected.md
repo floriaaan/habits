@@ -8,13 +8,16 @@ disponible dans ses fichiers d'origine, sans être raccordé implicitement.
 ## Installer via HACS
 
 Une seule intégration HACS installe le composant et la carte connectée. La carte
-est embarquée dans `custom_components/habit_tracker/www/` et chargée automatiquement
-par HA, sans copie dans `/config/www` ni ressource Lovelace à déclarer.
+est embarquée dans `custom_components/habit_tracker/www/`. Depuis 0.1.2, elle est
+enregistrée automatiquement comme ressource Lovelace en mode UI/storage. En mode
+ressources YAML, ajouter la déclaration indiquée dans le
+[guide public](../integrations/home-assistant/habit-tracker-ha/README.fr.md#si-les-ressources-lovelace-sont-gérées-en-yaml).
 
 Le dépôt public d'installation est
 [floriaaan/habit-tracker-ha](https://github.com/floriaaan/habit-tracker-ha).
 Première release : [v0.1.1](https://github.com/floriaaan/habit-tracker-ha/releases/tag/v0.1.1).
-Le backend `floriaaan/habits` reste privé ; le client est un sous-module verrouillé
+Correctif de chargement : [v0.1.2](https://github.com/floriaaan/habit-tracker-ha/releases/tag/v0.1.2).
+Le client est un sous-module verrouillé du backend `floriaaan/habits`
 à `integrations/home-assistant/habit-tracker-ha`. Pour préparer le poste :
 
 ```sh
@@ -59,13 +62,14 @@ Aucun secret HA n'est requis pour cette copie.
    restent refusées sans token ; `disabled` ne signifie pas accès anonyme.
 2. Créer un PAT ou un token de compte de service du bon utilisateur :
    `habits:read`, `statistics:read`, `entries:write`. Les deux premiers suffisent
-   aux lectures ; le dernier est indispensable aux boutons. Utiliser le bootstrap
-   CLI existant puis l'API de tokens pour obtenir un token à durée adaptée.
+   aux lectures ; le dernier est indispensable aux boutons. Utiliser le token
+   initial affiché au premier démarrage local ou la CLI, puis créer un token dédié.
 3. Redémarrer HA après installation du composant Python. Dans **Paramètres → Appareils et
    services → Ajouter une intégration → Habit Tracker**, renseigner URL et token.
    HTTPS est requis par défaut. HTTP exige la case explicite et une liaison locale
    de confiance. Les redirections ne sont jamais suivies avec le token.
-4. Recharger le navigateur : l'intégration charge la carte automatiquement. En
+4. Recharger complètement le navigateur : la ressource Lovelace est enregistrée
+   automatiquement en mode UI/storage ; en YAML, déclarer l'URL versionnée. En
    migration, retirer l'ancienne ressource `/local/habit-tracker/habit-tracker-card.js?...`
    pour éviter de charger une ancienne version. Conserver la config entry existante.
 5. Importer la vue de

@@ -344,3 +344,28 @@ fournisseur externe. Aucun secret réel ni Home Assistant personnel n'est utilis
   Les images testées sont publiées dans le manifeste GHCR multi-architecture
   (`latest` et `sha-e5af031b42f4b04316ad7adf6899b99d305dc8e2`). Aucun conteneur
   de production de l'opérateur n'a été modifié.
+
+## Carte Lovelace non trouvée — 2026-11-03
+
+- Le test HA ajouté avant correction échouait : aucune ressource module pour
+  `habit-tracker-card` dans la collection Lovelace, malgré une route statique
+  existante. La version 0.1.1 utilisait seulement `add_extra_js_url`.
+- Version 0.1.2 : ressource module versionnée créée en mode UI/storage, ancienne
+  URL mise à jour en conservant son ID, doublons propres à cette carte retirés,
+  ressources tierces et config entries préservées. En YAML, configuration
+  opérateur intacte, avertissement avec URL et procédure EN/FR explicite.
+- [HACS et Hassfest réussis](https://github.com/floriaaan/habit-tracker-ha/actions/runs/41699914967).
+  [Export et 3 tests d'archives réussis](https://github.com/floriaaan/habits/actions/runs/41700106259).
+  [CI backend complète réussie](https://github.com/floriaaan/habits/actions/runs/41700106173) :
+  **5 tests HA sur Linux**, dont liste des ressources reçue via WebSocket
+  authentifié, téléchargement HTTP du module, migration/rechargement sans
+  doublon, préservation YAML et parcours normal entités/actions/SSE. Les 64 tests
+  Rust, audit/deny et smoke Docker AMD64/ARM64 passent aussi.
+- Localement, les assertions de la suite HA passent, mais Python Homebrew
+  3.14.3 plante lors de sa finalisation/GC après la suite complète. Les nouveaux
+  tests migration et YAML exécutés séparément sortent avec code 0 ; la preuve
+  d'exécution de la suite complète est celle du runner Linux ci-dessus.
+- [Release HACS v0.1.2](https://github.com/floriaaan/habit-tracker-ha/releases/tag/v0.1.2)
+  publiée avec `habit_tracker.zip`, vérifié identique aux fichiers du composant
+  verrouillé dans le sous-module. Syntaxe JS, liens EN/FR et `git diff --check`
+  vérifiés. Aucun accès/modification au Home Assistant personnel de l'opérateur.
