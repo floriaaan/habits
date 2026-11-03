@@ -409,3 +409,45 @@ fournisseur externe. Aucun secret réel ni Home Assistant personnel n'est utilis
   La suite complète locale conserve le crash Python 3.14.3 en finalisation/GC
   déjà décrit ci-dessus ; la preuve de réussite complète provient du runner Linux.
   Aucun serveur HA personnel, secret opérateur ou fournisseur externe utilisé.
+
+
+## Animations HA et export OTLP — 2026-11-03
+
+- Backend `b94553e`, client `f236f46`, HACS **0.3.0**.
+- **68 tests Rust réussis** localement : 65 tests de bibliothèque, deux tests de
+  démarrage et le nouveau test OTLP exécutant le vrai binaire. Fmt, Clippy avec
+  warnings refusés, build release macOS arm64, audit, deny, actionlint, frontières
+  du domaine, OpenAPI inchangé et diff sans erreurs : succès.
+- Le test collecteur loopback vérifie les logs OTLP HTTP JSON, le service, les
+  templates de routes, le même request ID sur début/use-case/commit/réponse,
+  l'absence du PAT, token rejeté, nom d'habitude, query et clé d'idempotence.
+  L'API reste disponible pendant une panne du collecteur ; SIGTERM finit avec
+  succès après flush. Aucun collecteur réel ni secret d'opérateur n'est utilisé.
+- Test Chrome reproductible (`npm ci --ignore-scripts && npm test` dans le
+  sous-module) : remplissage et vidage des arcs/verres, reprise de progression
+  interrompue, layout à deux colonnes sur grand écran, absence de débordement sur
+  mobile, préférence reduced-motion. Les matrices CSS singulières à scaleY(0)
+  sont évitées par des keyframes scaleY normalisées ; le test initial échouait
+  avant cette correction. Captures 1440×900 et 390×844 examinées.
+- [HACS, Hassfest et test navigateur Linux réussis](https://github.com/floriaaan/habit-tracker-ha/actions/runs/41724751500).
+- Les sept assertions de la suite HA locale passent ; le crash Python 3.14.3 en
+  finalisation/GC reste présent après la suite complète. Le parcours HA principal
+  exécuté seul sort avec code 0 et vérifie désormais `sensor.habits_<user_id>`,
+  les PNG servis par l'API brands native et le maintien d'un entity ID personnalisé
+  après rechargement. Les IDs existants ne sont pas renommés automatiquement.
+- Archives HACS : trois tests réussis ; 19 fichiers identiques octet par octet au
+  composant committé. Icônes PNG générées avec ImageGen, redimensionnées avec sips,
+  source/prompt documentés dans le sous-module ; aucun asset distant au runtime.
+
+- [CI backend](https://github.com/floriaaan/habits/actions/runs/41724945080) :
+  Rust, audit/deny et **7 tests HA sur Linux réussis**, dont images natives HA,
+  nommage du capteur et préservation du registre. L'export/les trois tests des
+  archives passent aussi dans [le workflow dédié](https://github.com/floriaaan/habits/actions/runs/41724945237).
+- [Release HACS v0.3.0](https://github.com/floriaaan/habit-tracker-ha/releases/tag/v0.3.0)
+  publiée avec `habit_tracker.zip`, SHA-256
+  `8966b73e86bc1728231dc36c9d55a3015cb0fd4ca80b89c97be14b66c3cbf2f5`.
+
+- Smoke Docker **AMD64 et ARM64 réussis** et manifeste GHCR publié après toutes
+  les validations : `ghcr.io/floriaaan/habits:latest` et
+  `sha-b94553e49b8bc2980f9255d76ca2024ca04da76c`. Aucun conteneur de production
+  ni instance HA personnelle de l'opérateur n'a été modifié.
