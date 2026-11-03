@@ -15,7 +15,7 @@ The backend has no standalone web interface.
 
 ## Getting started
 
-With Docker and Docker Compose installed, save this block as **`compose.yaml`**
+With Docker and Docker Compose 2.23.1+ installed, save this block as **`compose.yaml`**
 in your deployment directory. The GHCR image supports AMD64 and ARM64; no build
 is required. All runtime environment variables are defined below; leave optional
 groups empty when unused.
@@ -71,9 +71,89 @@ services:
     cpus: 1.0
     pids_limit: 128
 
+  alloy:
+    image: grafana/alloy:v1.21.3
+    profiles: [observability]
+    user: "10001:10001"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      ROOTPRINT_ENDPOINT: ${ROOTPRINT_ENDPOINT:-}
+      ROOTPRINT_INGEST_TOKEN: ${ROOTPRINT_INGEST_TOKEN:-}
+    configs:
+      - source: alloy_config
+        target: /etc/alloy/config.alloy
+    command:
+      - run
+      - --storage.path=/tmp/alloy
+      - /etc/alloy/config.alloy
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m,mode=1777
+    restart: unless-stopped
+    stop_grace_period: 30s
+
+configs:
+  alloy_config:
+    content: |
+      otelcol.receiver.otlp "habits" {
+        http {
+          endpoint = "0.0.0.0:4318"
+        }
+        output {
+          logs = [otelcol.exporter.otlphttp.rootprint.input]
+        }
+      }
+
+      otelcol.exporter.otlphttp "rootprint" {
+        encoding = "proto"
+        client {
+          endpoint = sys.env("ROOTPRINT_ENDPOINT")
+          compression = "none"
+          headers = {
+            "Authorization" = "Bearer " + sys.env("ROOTPRINT_INGEST_TOKEN"),
+          }
+        }
+      }
+
+
 volumes:
   habit_data:
     driver: local
+```
+
+The `alloy` service is optional: it runs only with the `observability` profile.
+Its configuration is embedded in Compose; no separate `config.alloy` file is
+needed, and no Alloy port is published on the host. Without this profile, the
+API still starts normally and logs to the console.
+
+To send logs to **Rootprint**, add these values to the `.env` next to Compose:
+
+```dotenv
+OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=http://alloy:4318/v1/logs
+ROOTPRINT_ENDPOINT=https://rootprint.example.com
+ROOTPRINT_INGEST_TOKEN=<your-ingest-key>
+```
+
+Replace the example Rootprint URL with your API base URL, **without `/v1/logs`**.
+Create an index-bound ingest key in **Rootprint → Send data**, then replace the
+placeholder locally. This is not a Habit Tracker or HA token. Keep
+`OTEL_EXPORTER_OTLP_LOGS_HEADERS` empty for the internal hop to Alloy; the
+Rootprint credential is passed only to Alloy. Start both services with:
+
+```sh
+docker compose --profile observability up --detach --wait
+docker compose logs alloy
+```
+
+Alloy converts OTLP JSON to Protobuf and authenticates to Rootprint. To turn it
+off, stop Alloy and clear the API endpoint before recreating the API:
+
+```sh
+docker compose --profile observability stop alloy
+# Clear OTEL_EXPORTER_OTLP_LOGS_ENDPOINT in .env, then:
+docker compose up --detach --wait api
 ```
 
 If the GHCR package is private, first run `docker login ghcr.io` with your GitHub
@@ -186,6 +266,8 @@ or outbound HA notifications, the installation Compose values are sufficient.
 | `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` | `http://alloy:4318/v1/logs` | Optional full OTLP HTTP logs receiver URL. | [Obtain the endpoint](#observability) |
 | `OTEL_EXPORTER_OTLP_LOGS_HEADERS` | `Authorization=Bearer%20<collector-token>` | Optional collector authentication headers. | [Obtain headers](#observability) |
 | `OTEL_SERVICE_NAME` | `habit-tracker` | Collector service label. | [Choose a label](#observability) |
+| `ROOTPRINT_ENDPOINT` | `https://rootprint.example.com` | Rootprint API base URL for Alloy, without `/v1/logs`; required with the observability profile. | [Configure Rootprint](#observability) |
+| `ROOTPRINT_INGEST_TOKEN` | `<your-ingest-key>` | Index-bound Rootprint ingest key, passed only to Alloy. | [Create an ingest key](#observability) |
 | `AUTH_MODE` | `local` | `local` authentication (`tokens` alias), `oidc`, or closed routes with `disabled`. | [Choose a mode](#authentication) |
 | `OIDC_ISSUER` | `https://id.example.com` | Provider's exact HTTPS issuer. | [Read OIDC settings](#oidc) |
 | `OIDC_AUDIENCE` | `habit-tracker-api` | Expected access token audience for this API. | [Confirm the audience](#oidc) |
@@ -227,6 +309,12 @@ and does not read `.env`. After changing Compose variables, recreate the service
 with `docker compose up --detach --wait`.
 
 ### Observability
+
+The installation Compose includes Alloy for Rootprint. Obtain `ROOTPRINT_ENDPOINT`
+from your Rootprint deployment's API address, and `ROOTPRINT_INGEST_TOKEN` from
+**Send data** for the destination index. Alloy appends `/v1/logs` and sends
+Protobuf; the API keeps exporting JSON to Alloy. Use the `observability` profile
+and the `.env` values shown in Getting started.
 
 Set `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` to the collector's complete OTLP HTTP
 logs URL, for example `http://alloy:4318/v1/logs` on your trusted Docker network.

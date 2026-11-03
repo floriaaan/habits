@@ -16,7 +16,7 @@ Le backend ne fournit pas d'interface web autonome.
 
 ## Installation
 
-Avec Docker et Docker Compose, enregistrez ce bloc dans un **`compose.yaml`** dans
+Avec Docker et Docker Compose 2.23.1+, enregistrez ce bloc dans un **`compose.yaml`** dans
 votre dossier de déploiement. L'image GHCR est disponible pour AMD64 et ARM64 ;
 aucune compilation n'est nécessaire. Toutes les variables runtime sont définies ;
 laissez les groupes optionnels vides si vous ne les utilisez pas.
@@ -72,9 +72,91 @@ services:
     cpus: 1.0
     pids_limit: 128
 
+  alloy:
+    image: grafana/alloy:v1.21.3
+    profiles: [observability]
+    user: "10001:10001"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      ROOTPRINT_ENDPOINT: ${ROOTPRINT_ENDPOINT:-}
+      ROOTPRINT_INGEST_TOKEN: ${ROOTPRINT_INGEST_TOKEN:-}
+    configs:
+      - source: alloy_config
+        target: /etc/alloy/config.alloy
+    command:
+      - run
+      - --storage.path=/tmp/alloy
+      - /etc/alloy/config.alloy
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m,mode=1777
+    restart: unless-stopped
+    stop_grace_period: 30s
+
+configs:
+  alloy_config:
+    content: |
+      otelcol.receiver.otlp "habits" {
+        http {
+          endpoint = "0.0.0.0:4318"
+        }
+        output {
+          logs = [otelcol.exporter.otlphttp.rootprint.input]
+        }
+      }
+
+      otelcol.exporter.otlphttp "rootprint" {
+        encoding = "proto"
+        client {
+          endpoint = sys.env("ROOTPRINT_ENDPOINT")
+          compression = "none"
+          headers = {
+            "Authorization" = "Bearer " + sys.env("ROOTPRINT_INGEST_TOKEN"),
+          }
+        }
+      }
+
+
 volumes:
   habit_data:
     driver: local
+```
+
+Le service `alloy` est optionnel : il démarre uniquement avec le profil
+`observability`. Sa configuration est intégrée au Compose : aucun fichier
+`config.alloy` séparé n'est nécessaire, et aucun port Alloy n'est publié sur
+l'hôte. Sans ce profil, l'API démarre normalement avec ses logs console.
+
+Pour envoyer les logs vers **Rootprint**, ajoutez dans le `.env` à côté du Compose :
+
+```dotenv
+OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=http://alloy:4318/v1/logs
+ROOTPRINT_ENDPOINT=https://rootprint.example.com
+ROOTPRINT_INGEST_TOKEN=<votre-cle-ingestion>
+```
+
+Remplacez l'URL d'exemple par l'URL de base de votre API Rootprint, **sans
+`/v1/logs`**. Créez une clé d'ingestion associée à l'index dans **Rootprint → Send
+data**, puis remplacez le placeholder localement. Ce n'est pas un token Habit
+Tracker ou HA. Laissez `OTEL_EXPORTER_OTLP_LOGS_HEADERS` vide pour le trajet
+interne vers Alloy : seul Alloy reçoit le credential Rootprint. Lancez les deux
+services avec :
+
+```sh
+docker compose --profile observability up --detach --wait
+docker compose logs alloy
+```
+
+Alloy convertit les logs OTLP JSON en Protobuf et s'authentifie auprès de
+Rootprint. Pour le désactiver, arrêtez Alloy et videz l'endpoint API avant de
+recréer l'API :
+
+```sh
+docker compose --profile observability stop alloy
+# Vider OTEL_EXPORTER_OTLP_LOGS_ENDPOINT dans .env, puis :
+docker compose up --detach --wait api
 ```
 
 Si le package GHCR est privé, faites d'abord `docker login ghcr.io` avec votre
@@ -191,6 +273,8 @@ Sans OIDC, Strava ni notifications HA, les valeurs du Compose d'installation suf
 | `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` | `http://alloy:4318/v1/logs` | URL complète du receiver OTLP HTTP logs, facultative. | [Obtenir l'URL](#observabilité) |
 | `OTEL_EXPORTER_OTLP_LOGS_HEADERS` | `Authorization=Bearer%20<collector-token>` | Headers d'authentification du collecteur, facultatifs. | [Obtenir les headers](#observabilité) |
 | `OTEL_SERVICE_NAME` | `habit-tracker` | Libellé du service dans le collecteur. | [Choisir le libellé](#observabilité) |
+| `ROOTPRINT_ENDPOINT` | `https://rootprint.example.com` | URL de base de l'API Rootprint pour Alloy, sans `/v1/logs` ; requise avec le profil observability. | [Configurer Rootprint](#observabilité) |
+| `ROOTPRINT_INGEST_TOKEN` | `<votre-cle-ingestion>` | Clé d'ingestion Rootprint liée à l'index, fournie uniquement à Alloy. | [Créer la clé d'ingestion](#observabilité) |
 | `AUTH_MODE` | `local` | Authentification `local` (alias `tokens`), `oidc` ou routes fermées `disabled`. | [Choisir le mode](#authentification) |
 | `OIDC_ISSUER` | `https://id.example.com` | Issuer HTTPS exact du fournisseur. | [Lire les valeurs OIDC](#oidc) |
 | `OIDC_AUDIENCE` | `habit-tracker-api` | Audience attendue des access tokens pour cette API. | [Confirmer l'audience](#oidc) |
@@ -232,6 +316,12 @@ variables exportées et ne lit pas `.env`. Après modification des variables Com
 recréez le service avec `docker compose up --detach --wait`.
 
 ### Observabilité
+
+Le Compose d'installation inclut Alloy pour Rootprint. `ROOTPRINT_ENDPOINT`
+provient de l'adresse API de votre déploiement Rootprint ;
+`ROOTPRINT_INGEST_TOKEN` se crée dans **Send data** pour l'index destinataire.
+Alloy ajoute `/v1/logs` et envoie du Protobuf ; l'API continue d'envoyer du JSON
+à Alloy. Activez le profil `observability` avec les valeurs `.env` de l'installation.
 
 Renseigner `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` avec l'URL complète du receiver
 OTLP HTTP logs, par exemple `http://alloy:4318/v1/logs` sur le réseau Docker de

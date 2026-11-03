@@ -25,8 +25,12 @@ environment:
 `alloy` est un exemple de nom de service Docker, pas une URL de production.
 L'opérateur configure son receiver Alloy ou OpenTelemetry Collector pour accepter
 OTLP HTTP sur le port choisi et router les logs vers son stockage. Tout autre
-collecteur doit accepter ce même protocole ; aucune compatibilité spécifique
-Rootprint non vérifiée n'est revendiquée. Le sink ne parle pas directement le
+collecteur doit accepter ce même protocole. Le [Compose des README](../README.fr.md#installation)
+embarque Alloy dans le profil `observability` pour convertir le JSON en Protobuf
+et l'envoyer à Rootprint avec sa clé d'ingestion. Rootprint exige actuellement
+`application/x-protobuf` sur `/v1/logs` : le sink JSON ne doit pas le viser
+directement. La configuration du bridge est validée ; aucun serveur Rootprint
+réel de l'opérateur n'a été contacté. Le sink ne parle pas directement le
 protocole Loki Push, syslog ou OTLP gRPC.
 
 Les URLs refusent credentials intégrés, query et fragment et doivent terminer
