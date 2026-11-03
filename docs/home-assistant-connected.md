@@ -35,7 +35,7 @@ Dans **HACS → ⋮ → Dépôts personnalisés**, saisir
 chercher **Habit Tracker**, télécharger et
 redémarrer HA. Pas de deuxième dépôt Dashboard à installer. HA **2026.10.2 minimum**.
 Le serveur Rust se lance séparément ; HACS n'installe pas un add-on du backend.
-Voir le [guide public](https://github.com/floriaaan/habit-tracker-ha#installation-hacs).
+Voir le [guide public en français](https://github.com/floriaaan/habit-tracker-ha/blob/main/README.fr.md#installation).
 
 ## Installation par copie (secours et développement)
 

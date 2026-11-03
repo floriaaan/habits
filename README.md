@@ -1,255 +1,202 @@
 # Habit Tracker
 
-API REST self-hosted Rust 0.1.0, sans frontend : Axum/Tokio/Tower,
-SQLite/SQLx, OpenAPI utoipa et logs JSON tracing.
-[ADR-001](docs/adr/ADR-001-backend-rust.md) reste la source de vérité.
+**Self-hosted habit tracking, built for Home Assistant and automation.**
 
-Le parcours local est utilisable avec PAT : habitudes, planifications quotidiennes
-ou hebdomadaires, réalisations, corrections/annulations idempotentes, repos,
-statistiques 7/30/90 jours, heatmap, streaks et XP compensables.
-Pocket ID/OIDC, Strava et Home Assistant sont facultatifs. Leurs adaptateurs sont
-testés hors ligne ; leur validation avec des comptes réels reste à effectuer.
+English · [Français](README.fr.md)
 
-L'[intégration Home Assistant connectée](docs/home-assistant-connected.md) fournit
-entités automatiques, carte, anneaux, actions et mises à jour en direct. Le
-[paquet HACS](docs/home-assistant-connected.md#installer-via-hacs) installe la carte
-avec l'intégration, sans ressource Lovelace manuelle, depuis le dépôt public
-[floriaaan/habit-tracker-ha](https://github.com/floriaaan/habit-tracker-ha).
-Le backend reste privé. Le client est verrouillé par le sous-module
-`integrations/home-assistant/habit-tracker-ha` ; après clonage du backend :
+Habit Tracker is a Rust REST API backed by SQLite. Track daily routines and sport,
+record check-ins, and follow goals, streaks, statistics and XP. Boolean, quantity,
+duration and frequency habits support schedules, rest days and IANA time zones.
+
+Use the API from scripts or connect the
+[Home Assistant integration and cards](https://github.com/floriaaan/habit-tracker-ha).
+Pocket ID/OIDC, Strava and outbound Home Assistant notifications are optional.
+The backend has no standalone web interface.
+
+## Getting started — production
+
+### 1. Get the production Compose file
+
+You need Docker Engine with Docker Compose and access to the GHCR image.
+Download [compose.production.yaml](compose.production.yaml) into your deployment
+directory. This is the only project file required: no Rust installation, source
+checkout or image build. Run the following commands beside that file.
+
+The image is `ghcr.io/floriaaan/habits:latest`, available for AMD64 and ARM64.
+Docker selects the platform automatically.
+
+### 2. Pull the image
+
+If the GHCR package is private, sign in first:
 
 ```sh
+docker login ghcr.io
+```
+
+Enter your GitHub username and a GitHub personal access token **(classic)** with
+`read:packages` and access to the package at the password prompt. This registry
+credential is separate from the Habit Tracker API token. See
+[GitHub's registry authentication guide](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry#authenticating-to-the-container-registry).
+
+```sh
+docker compose -f compose.production.yaml pull
+```
+
+### 3. Create the local user and start the API
+
+On a **new installation**, run the bootstrap once, then start the service:
+
+```sh
+docker compose -f compose.production.yaml run --rm --no-deps api bootstrap-local Europe/Paris
+docker compose -f compose.production.yaml up --detach --wait
+docker compose -f compose.production.yaml exec -T api /usr/local/bin/habit-tracker healthcheck
+```
+
+Choose your own IANA time zone instead of `Europe/Paris` if needed. Bootstrap
+prints a JSON response with `token` and `metadata.user_id`. Save the token in a
+password manager: its secret is shown only at issuance and expires after **24 hours**.
+Do not rerun bootstrap on an existing installation; use the token-management CLI
+or API instead. Migrations run automatically.
+
+Production Compose defaults to `AUTH_MODE=local`: one persistent user, with a valid
+Bearer token required for every private API request. No Pocket ID setup is needed.
+`AUTH_MODE=disabled` explicitly closes private routes; it never enables anonymous access.
+
+### 4. Connect your clients
+
+The API listens at `http://127.0.0.1:8080` on the Docker host. For Home Assistant
+or remote clients, put it behind your HTTPS reverse proxy, such as NPMplus:
+
+- A proxy on the host can target `127.0.0.1:8080`. A containerized proxy must share
+  the API's Docker network and can target `api:8080`.
+- Keep `/health/*` internal. For `/api/v1/dashboard/events`, disable proxy buffering
+  and allow long connections (`proxy_read_timeout 75s` with Nginx).
+- Give Home Assistant a backend URL reachable **from HA**, without `/api/v1`.
+  Follow the [HA installation guide](https://github.com/floriaaan/habit-tracker-ha#installation).
+
+For a first habit, load the bootstrap token into `HABIT_TOKEN` from your secret
+manager, then run this on the Docker host:
+
+```sh
+curl --fail http://127.0.0.1:8080/api/v1/habits \
+  -H "Authorization: Bearer $HABIT_TOKEN" \
+  -H 'Content-Type: application/json' \
+  --data '{"name":"Reading","category":"mind","kind":"boolean","unit":"count","target":1,"timezone":"Europe/Paris"}'
+```
+
+For ongoing HA use, issue a dedicated token with `habits:read`, `statistics:read`
+and `entries:write`. Set `HABIT_USER_ID` to the bootstrap's `metadata.user_id` and
+`HABIT_EXPIRES_AT` to a future RFC 3339 UTC timestamp within 365 days:
+
+```sh
+docker compose -f compose.production.yaml exec -T api \
+  /usr/local/bin/habit-tracker token-create "${HABIT_USER_ID:?}" \
+  'habits:read,statistics:read,entries:write' "${HABIT_EXPIRES_AT:?}"
+```
+
+Use the returned `token` in HA. This is a Habit Tracker token, not a GitHub or HA
+long-lived access token. [Authentication and rotation](docs/auth.md) covers other clients.
+
+### Configuration, updates and data
+
+An optional `.env` beside the production file can override these defaults:
+
+```dotenv
+AUTH_MODE=local
+HABIT_TRACKER_TAG=latest
+HOST_BIND=127.0.0.1
+HOST_PORT=8080
+```
+
+Use a published `sha-<full-commit>` tag to pin a deployment. The
+[configuration reference](.env.example) lists optional OIDC and integration
+settings; production Compose already sets the internal database path and address.
+If you copy `.env.example`, set `AUTH_MODE=local` for this walkthrough: that
+example otherwise leaves private routes disabled.
+Strava and outbound HA notifications need additional configuration; reading and
+updating habits from HA does not require the outbound HA connector.
+
+To update, back up the database, then pull and recreate the service:
+
+```sh
+docker compose -f compose.production.yaml pull
+docker compose -f compose.production.yaml up --detach --wait
+docker compose -f compose.production.yaml logs --tail=100 api
+```
+
+SQLite lives in the local `habit_data` volume, mounted at `/data`. `down` preserves
+it; `down --volumes` deletes it. Keep the active database on local disk.
+[Backup and restore](docs/operations.md) describes consistent SQLite snapshots.
+The container runs as UID/GID 10001 with a read-only root filesystem and no capabilities.
+
+## Development
+
+### Clone the backend and HA client
+
+The backend repository is private; GitHub access is required. The public HA
+client is pinned as a Git submodule.
+
+```sh
+git clone --recurse-submodules https://github.com/floriaaan/habits.git
+cd habits
+# For an existing clone:
 git submodule update --init --recursive
 ```
 
-Le parcours par copie `task ha:install HA_CONFIG_DIR=/chemin/config-ha` reste disponible.
-Redémarrer HA puis configurer URL/token dans l'intégration. Le
-[prototype de laboratoire](docs/home-assistant-ui.md), avec ses helpers et ses
-statistiques fictives, est conservé séparément. Les cartes ne sont pas compilées
-avec Rust.
-Pour répercuter les changements de carte dans HA, utiliser
-`task --watch ha:sync HA_WWW_DIR="/chemin/config/custom_components/habit_tracker/www"`
-avec le dossier HA monté sur le poste de développement, puis recharger la page HA.
-Avec un accès SSH, utiliser plutôt
-`task --watch ha:sync:ssh HA_SSH_HOST="alias-ssh"` : aucun partage monté nécessaire.
+### Develop inside Docker with Task
 
-## Démarrage local
-
-Prérequis : rustup, compilateur C et CMake. Rust 1.99.1 et dépendances fixées
-par rust-toolchain.toml, Cargo.toml et Cargo.lock.
+Install Docker Compose and [Task](https://taskfile.dev/docs/installation).
+The development service uses the official Rust image directly, with the source
+mounted into it. There is no development image to build and no host Rust requirement.
 
 ```sh
-rustup toolchain install 1.99.1 --profile minimal --component rustfmt --component clippy
+task dev:bootstrap TIMEZONE=Europe/Paris   # Once, on the development database
+AUTH_MODE=local task dev
+```
+
+The API is available at `http://127.0.0.1:8080`. After editing Rust, stop with
+Ctrl+C and rerun `task dev`; Cargo recompiles the changed code. Development data
+uses `data/dev/`, and Linux build caches use `target/docker/`, separate from production.
+If production is running on the same host port, use `HOST_PORT=8081` for development.
+
+```sh
+task dev:test
+task dev:cargo -- fmt --all -- --check
+task dev:cargo -- clippy --locked --all-targets --all-features -- -D warnings
+task dev:shell
+```
+
+### Develop with a local Rust toolchain
+
+Install Rust **1.99.1**, a C compiler and CMake. Dependencies are pinned in `Cargo.lock`.
+`cargo run` does not load `.env`; export the variables you need.
+
+```sh
 cargo run --locked -- bootstrap-local Europe/Paris
 AUTH_MODE=local cargo run --locked
-```
-
-Le bootstrap affiche une seule fois un PAT de 24 h, à conserver dans un gestionnaire
-de secrets. Il ne se répète pas. L'utilisateur local persiste avec le même UUID.
-Sans `AUTH_MODE=local` ou `oidc`, **toutes les routes privées retournent 401**.
-Le mode local exige un Bearer valide de cet utilisateur unique. Aucun en-tête
-d'identité ou mode anonyme ne donne accès aux données. Une panne OIDC ne déclenche
-aucun basculement vers un autre utilisateur.
-
-```sh
-curl --fail http://127.0.0.1:8080/health/ready
-# HABIT_TOKEN doit être chargé depuis votre gestionnaire de secrets.
-curl --fail -H "Authorization: Bearer $HABIT_TOKEN" -H 'Content-Type: application/json' --data @tests/fixtures/habit.json http://127.0.0.1:8080/api/v1/habits
-```
-
-`.env.example` fournit les noms de configuration sans secret. `cargo run` ne charge
-pas `.env` automatiquement ; exporter les variables. Compose transmet les paramètres
-facultatifs. `LISTEN_ADDR` vaut `127.0.0.1:8080`, `DATABASE_PATH` vaut
-`data/habits.sqlite`, `AUTH_MODE` vaut `disabled` par défaut. La base active doit
-rester sur disque local. [Authentification](docs/auth.md),
-[connecteurs et exemples HA](docs/integrations.md).
-
-## Développement dans Docker avec Task
-
-Prérequis hôte : Docker avec Compose et [Task](https://taskfile.dev/docs/installation).
-Rust, CMake et Cargo ne sont pas nécessaires sur l'hôte pour ce parcours.
-
-Le développement utilise directement l'image Rust officielle, sans Dockerfile
-de développement ni build d'image applicative. Le dépôt est monté dans le
-conteneur, qui compile et exécute `cargo run --locked` en mode debug. Le processus
-utilise l'UID/GID de l'utilisateur hôte. Les caches Cargo/Rust et les artefacts
-Linux restent dans `target/docker/`, distincts du build natif ; la base se trouve
-dans `data/dev/habits.sqlite`, distincte du volume de production.
-
-```sh
-task dev:bootstrap                    # une seule fois : affiche le PAT initial
-AUTH_MODE=local task dev              # API sur http://127.0.0.1:8080
-```
-
-Le mode par défaut reste fermé ; renseigner `AUTH_MODE=local` dans `.env` pour
-conserver ce choix. Les connecteurs restent optionnels. Le premier lancement
-télécharge la toolchain du dépôt et les dépendances dans le cache monté.
-Après modification du code, arrêter avec Ctrl+C puis relancer `task dev` : Cargo
-recompile uniquement ce qui a changé. Aucun rechargement automatique n'est ajouté.
-
-```sh
-task dev:test                        # tests dans Linux
-task dev:cargo -- check --locked
-task dev:cargo -- fmt --all -- --check
-task dev:cargo -- clippy --locked --all-targets -- -D warnings
-task dev:shell                       # shell dans le même environnement
-```
-
-`task dev:bootstrap TIMEZONE=UTC` permet de choisir un autre fuseau. Les commandes
-partagent les caches et la base de développement ; les tests créent leurs bases
-temporaires. Ctrl+C arrête le serveur et le conteneur éphémère est supprimé sans
-effacer les caches ni les données. `HOST_PORT` permet de changer le port hôte.
-
-## Arborescence
-
-```text
-src/
-├── main.rs, lib.rs, config.rs
-├── modules/
-│   ├── auth/, users/, habits/, entries/, schedules/
-│   ├── streaks/, statistics/, gamification/
-│   └── integrations/{strava/,home_assistant/}
-├── infrastructure/
-│   ├── database/{mod,auth,tracking,integrations,jobs}.rs
-│   ├── jobs/mod.rs
-│   ├── security/{mod,cipher,oidc}.rs
-│   └── integrations.rs
-└── http/{routes,middleware,auth,tracking,integrations}.rs
-migrations/000{1_initial,2_auth,3_events_projections,4_integrations_jobs,5_habit_categories,6_dashboard}.sql
-integrations/home-assistant/{cards/,lovelace/,docs/}
-tests/fixtures/    scripts/    docs/    .github/workflows/ci.yml
-```
-
-Les règles métier n'importent ni Axum ni SQLx ni Reqwest. Les handlers délèguent
-aux services et adaptateurs ; les transactions SQLx regroupent les écritures.
-Choix complémentaires : [décisions de l'itération 2](docs/decisions-iteration-2.md).
-
-## API v1
-
-Healthchecks internes sans token : `GET /health/live` et `/health/ready`.
-À garder inaccessibles depuis l'entrée publique NPMplus.
-
-| Routes privées | Fonction |
-|---|---|
-| `GET /api/v1`, `/api/v1/openapi.json` | Version et contrat |
-| `GET /api/v1/dashboard` ; `GET /api/v1/dashboard/events` | Dashboard complet et invalidations SSE authentifiées |
-| `GET/POST /api/v1/habits` | Liste/création |
-| `GET/PUT/DELETE /api/v1/habits/{id}` | Lecture, définition future, archivage |
-| `GET /api/v1/habits/{id}/versions` | Historique des définitions |
-| `PUT …/habits/{id}/presentation` ; `POST …/habits/{id}/actions` | Icône/couleur/ordre/poids/pas/rappel et actions HA idempotentes |
-| `GET /api/v1/habits/{id}/exceptions` ; `PUT/DELETE …/exceptions/{date}` | Repos |
-| `POST/GET /api/v1/habits/{id}/entries` | Réalisation/liste |
-| `GET/PUT/DELETE /api/v1/entries/{id}` | Lecture, correction, annulation |
-| `GET …/habits/{id}/statistics` ; `POST …/habits/{id}/recalculate` | Projections et replay |
-| `GET /api/v1/gamification`, `/api/v1/gamification/ledger` | XP, niveaux, badges, ledger |
-| `GET/POST /api/v1/tokens` ; `DELETE …/tokens/{id}` ; `POST …/tokens/{id}/rotate` | PAT/SA |
-| `POST /api/v1/service-accounts` ; `DELETE …/service-accounts/{id}` | Comptes de service |
-| `GET /api/v1/integrations` ; `DELETE …/integrations/{id}` | Configuration/révocation locale |
-| `PUT …/integrations/home-assistant` ; `POST …/home-assistant/notifications` | HA chiffré/jobs |
-| `POST …/integrations/strava/authorize`, `…/strava/sync` ; `PUT …/strava/mappings` | OAuth/synchronisation |
-| `GET /api/v1/jobs/{id}` | État sans payload ni credentials |
-
-Les endpoints dédiés `/integrations/strava/callback` et
-`/integrations/strava/webhook/{token}` suivent les validations OAuth/webhook,
-sans Bearer. Le callback exige un state à usage unique et la destination est
-configurée ; le webhook ne supprime rien avant vérification auprès de Strava.
-
-Le [contrat OpenAPI](docs/openapi.json) détaille corps, scopes et réponses.
-Les mutations d'entrée et jobs exigent `Idempotency-Key` : rejeu identique sans
-nouvelle entrée/XP, conflit 409 si contenu différent. Ressource étrangère : 404 ;
-scope insuffisant : 403 ; validation : 422. Erreurs JSON uniformes et
-`X-Request-Id` généré côté serveur. Limites : JSON 16 KiB, 120 requêtes/s globales,
-64 simultanées, timeout 10 s. Pagination limit 1..100, offset <=100000.
-
-Les dates RFC3339 exigent un offset ; stockage UTC, éligibilité en fuseau IANA
-(DST testé). Les fenêtres horaires restent dans une même journée. Les changements
-de cible/planning prennent effet à une date future ; type, unité, période et fuseau
-restent immuables. Boolean=count/1, duration=seconds, frequency=count entier,
-quantity=meters/milliliters/count. Les repos ne comptent ni comme réussites ni
-comme échecs et ne cassent pas les séries. Une période atteinte rapporte 10 XP ;
-les changements de résultat produisent des compensations dans le ledger.
-
-Chaque habitude porte une `category` : `nutrition` (Alimentation), `sport`,
-`mind` (Esprit) ou `daily` (Quotidien). Exemple : ajouter `"category": "sport"`
-au corps de création. Le champ est retourné en création, lecture, liste et
-historique ; son omission signifie `daily`, y compris dans une définition
-complète envoyée par PUT. Une modification prend effet à la date future de la
-version, sans effet sur les XP. Les anciennes habitudes reçoivent `daily`.
-Voir les [décisions et précautions de migration](docs/decisions-habit-categories.md).
-
-Le dashboard compose les catégories, anneaux pondérés, compteurs, comparaison des
-semaines et 91 jours d'historique. Une intégration HA installable crée les entités,
-relie les actions aux événements et reçoit les changements par SSE. Métadonnées
-et rappels automatiques sont configurables par habitude :
-[installation et contrat HA connecté](docs/home-assistant-connected.md).
-Les rappels exigent le connecteur sortant HA ; la lecture et les actions restent
-indépendantes de ce connecteur.
-
-## Migrations et stockage
-
-SQLx applique automatiquement les six migrations et vérifie leurs checksums :
-
-1. `0001_initial.sql` : tables tenant-scoped, identités, habitudes, schedules,
-   exceptions, entrées/événements, sources, intégrations, jobs, tokens et ledger.
-2. `0002_auth.sql` : bootstrap, désactivation et audit des comptes de service.
-3. `0003_events_projections.sql` : définitions versionnées, événements métier,
-   projections et ledger compensable ; reprise des événements/XP existants testée.
-4. `0004_integrations_jobs.sql` : bail des jobs, hash de payload, révision des
-   credentials, states OAuth hashés, mappings et compteurs de quotas.
-5. `0005_habit_categories.sql` : catégorie `daily` pour les définitions et versions
-   existantes sans catégorie ; événements, entrées et ledger conservés.
-6. `0006_dashboard.sql` : présentation, reçus d'actions, révisions transactionnelles
-   et déduplication des rappels ; aucune modification des réalisations historiques.
-
-WAL, FK activées, synchronous=FULL, busy_timeout 5 s ; FK composites et index
-uniques assurent isolation et idempotence. Réalisation/événements/projections/XP
-sont atomiques sous `BEGIN IMMEDIATE`. Les credentials sont chiffrés AES-256-GCM
-avec clé injectée, les PAT et states OAuth sont hashés. Ne pas modifier une
-migration déjà appliquée.
-
-## Docker et publication
-
-```sh
-docker compose config --quiet
-docker compose up --build --detach --wait
-docker compose exec -T api /usr/local/bin/habit-tracker bootstrap-local Europe/Paris
-AUTH_MODE=local docker compose up --detach --wait
-docker compose exec -T api /usr/local/bin/habit-tracker healthcheck
-docker compose down
-```
-
-UID/GID 10001, rootfs read-only, capabilities supprimées, no-new-privileges,
-aucun Docker socket, volume local `/data`, port loopback `HOST_PORT=8080`.
-NPMplus termine HTTPS. [Sauvegardes/restauration](docs/operations.md).
-
-La CI construit et publie dans `ghcr.io/<owner>/<repository>` avec `GITHUB_TOKEN`,
-après validation Rust/Docker, sur branche par défaut, tags SemVer et déclenchement
-manuel ; aucune publication depuis les PR. Images amd64/arm64, tags SHA/SemVer/latest
-selon événement. [Conditions exactes](docs/container-publishing.md).
-Les images sont compilées et testées sur runners natifs AMD64/ARM64, puis publiées
-sans recompilation. Les dépendances Rust, les outils d'audit, pip et les couches
-Docker sont mis en cache ; les commits purement documentaires ignorent ces builds.
-
-## Vérification
-
-```sh
 cargo fmt --all -- --check
 cargo clippy --locked --all-targets --all-features -- -D warnings
 cargo test --locked --all-targets
 cargo build --locked --release
-cargo run --locked -- openapi > /tmp/openapi.json
-diff -u docs/openapi.json /tmp/openapi.json
-python3 scripts/check_domain_boundaries.py
-cargo install cargo-audit --version 0.22.2 --locked
-cargo audit --deny warnings
-cargo install cargo-deny --version 0.20.2 --locked
-cargo deny --locked check
-actionlint
-python3 scripts/docker_smoke.py
 ```
 
-Le smoke utilise son propre projet/volume éphémère et vérifie aussi PAT local,
-check-in, idempotence, XP et restauration. Les fixtures ne sont jamais chargées
-dans une base runtime. Preuves et limites : [validation](docs/validation.md).
-Travail restant ordonné et aligné Notion : [TODO-MVP](TODO-MVP.md).
-Licence MIT.
+`compose.yaml` builds the image locally; `compose.production.yaml` only pulls GHCR.
+`python3 scripts/docker_smoke.py` tests a separate local build and temporary volume.
+CI also checks audit/deny, OpenAPI, domain boundaries and both native image platforms.
+
+### Work on the HA client
+
+Edit `integrations/home-assistant/habit-tracker-ha`. Commit and push in that
+repository first, then commit its updated pointer in the backend. The
+[HA development guide](docs/home-assistant-connected.md) covers installation,
+card synchronization and real HA tests. JavaScript changes need a browser reload;
+Python integration changes need an appropriate HA reload or restart.
+
+## Reference
+
+[API contract](docs/openapi.json) · [Authentication](docs/auth.md) ·
+[Integrations](docs/integrations.md) · [Operations](docs/operations.md) ·
+[Architecture / ADR-001](docs/adr/ADR-001-backend-rust.md) ·
+[Validation](docs/validation.md) · [MVP backlog](TODO-MVP.md)
+
+Detailed technical documents are currently in French. MIT license — [LICENSE](LICENSE).

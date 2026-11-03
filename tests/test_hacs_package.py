@@ -21,12 +21,15 @@ class HacsPackageTest(unittest.TestCase):
             with ZipFile(output / "hacs-repository.zip") as archive:
                 names = archive.namelist()
                 prefix = "custom_components/habit_tracker/"
-                self.assertTrue(all(name in ("README.md", "LICENSE", "hacs.json") or
+                self.assertTrue(all(name in ("README.md", "README.fr.md", "LICENSE", "hacs.json") or
                                     name.startswith(prefix) for name in names))
                 self.assertFalse(any("__pycache__" in name or name.endswith(".pyc") for name in names))
                 self.assertIn(prefix + "www/habit-tracker-card.js", names)
                 self.assertIn(prefix + "www/dashboard.yaml", names)
                 self.assertIn(prefix + "translations/fr.json", names)
+                self.assertIn("README.fr.md", names)
+                self.assertIn(b"README.fr.md", archive.read("README.md"))
+                self.assertIn(b"README.md", archive.read("README.fr.md"))
                 hacs = json.loads(archive.read("hacs.json"))
                 self.assertEqual(hacs["homeassistant"], "2026.10.2")
                 manifest = json.loads(archive.read(prefix + "manifest.json"))

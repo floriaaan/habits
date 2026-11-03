@@ -32,6 +32,7 @@ def package(destination: Path, repository: str):
         shutil.copyfile(CLIENT_ROOT / "hacs.json", export / "hacs.json")
         shutil.copyfile(CLIENT_ROOT / "LICENSE", export / "LICENSE")
         shutil.copyfile(CLIENT_ROOT / "README.md", export / "README.md")
+        shutil.copyfile(CLIENT_ROOT / "README.fr.md", export / "README.fr.md")
         with ZipFile(destination / "habit_tracker.zip", "w", ZIP_DEFLATED) as archive:
             for source in sorted(component.rglob("*")):
                 if source.is_file():
