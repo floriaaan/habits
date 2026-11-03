@@ -280,3 +280,31 @@ pas les attestations Buildx, comme indiqué dans container-publishing.md.
   maintenant dans le dépôt public ; le backend conserve les tests avec l'API Rust.
 - `actionlint`, syntaxe JS et `git diff --check` : succès. Pas d'installation,
   redémarrage ou configuration effectué sur le Home Assistant de l'opérateur.
+
+## README bilingues et Compose de production — 2026-11-03
+
+- `README.md` anglais et `README.fr.md` français dans les deux dépôts, avec
+  liens de langue réciproques. Les quatre guides ont des blocs de code équilibrés
+  et des liens de fichiers locaux résolus. Le guide public HA ne dépend pas du
+  dépôt backend privé.
+- `compose.production.yaml` copié seul dans un répertoire temporaire et validé
+  avec `docker compose --env-file /dev/null -f … config --format json` : image
+  `ghcr.io/floriaaan/habits:latest`, aucune instruction build, auth locale par PAT,
+  port loopback, volume local `/data`, UID/GID 10001, rootfs read-only et toutes les
+  capabilities supprimées. Les options de durcissement correspondent au Compose
+  des smoke tests. Les substitutions tag/auth/adresse/port ont aussi été vérifiées.
+- **3 tests d'export HACS réussis**, dont la présence des README EN/FR et leurs
+  liens réciproques dans l'archive. `actionlint` et `git diff --check` réussis.
+- [HACS/Hassfest du client public réussis](https://github.com/floriaaan/habit-tracker-ha/actions/runs/41680597197)
+  et [export backend réussi](https://github.com/floriaaan/habits/actions/runs/41680676445).
+  Le sous-module verrouille le commit documentaire `ac8d1e1` ; le composant
+  installé reste en version 0.1.1, sans changement de son code.
+- [CI backend complète réussie](https://github.com/floriaaan/habits/actions/runs/41680676634) :
+  fmt, clippy, tests Rust/HA, OpenAPI, audit/deny, smoke Docker natif AMD64/ARM64
+  et publication multi-architecture GHCR. Ces smoke tests utilisent le Compose
+  local existant ; ils ne constituent pas un déploiement du nouveau fichier de
+  production sur le homelab.
+
+Docker/OrbStack n'était pas démarré sur le poste : la validation locale du nouveau
+Compose est statique. Aucun service de production ni Home Assistant personnel n'a
+été démarré, installé ou reconfiguré pour cette rédaction.

@@ -2,12 +2,21 @@
 
 ## Déploiement
 
-`docker compose up --build --detach --wait` démarre sans privilèges. Le volume
+Pour une nouvelle installation, suivez le [README](../README.fr.md#installation--production)
+pour télécharger l'image GHCR et créer l'utilisateur. Les commandes ci-dessous
+utilisent le fichier autonome `compose.production.yaml`, sans build local :
+
+```sh
+docker compose -f compose.production.yaml pull
+docker compose -f compose.production.yaml up --detach --wait
+```
+
+`compose.yaml` reste réservé aux builds locaux et smoke tests. Le volume
 nommé local est initialisé avec les droits UID/GID 10001. Un bind mount alternatif
 doit être préparé par l'opérateur avec ce propriétaire et des permissions 0700.
 Ne jamais utiliser la base active sur un montage réseau. Les fichiers de base,
 WAL et SHM doivent résider ensemble sur ce volume. Aucun secret de production
-ou URL de fournisseur n'est nécessaire pour le mode fermé livré.
+ou URL de fournisseur n'est nécessaire pour le mode local avec PAT.
 
 NPMplus termine HTTPS ; interdire la publication des healthchecks et n'ouvrir
 l'API qu'après l'authentification réelle. Le processus n'utilise pas
@@ -22,11 +31,11 @@ de destination est un argument local CLI, jamais une entrée HTTP ; la commande
 refuse un chemin déjà existant. Prévoir l'espace disque pour une copie complète.
 
 ```sh
-docker compose exec -T api mkdir -p /data/backups
-docker compose exec -T api /usr/local/bin/habit-tracker backup /data/backups/snapshot.sqlite
-docker compose exec -T api sqlite3 /data/backups/snapshot.sqlite 'PRAGMA quick_check; PRAGMA foreign_key_check;'
+docker compose -f compose.production.yaml exec -T api mkdir -p /data/backups
+docker compose -f compose.production.yaml exec -T api /usr/local/bin/habit-tracker backup /data/backups/snapshot.sqlite
+docker compose -f compose.production.yaml exec -T api sqlite3 /data/backups/snapshot.sqlite 'PRAGMA quick_check; PRAGMA foreign_key_check;'
 mkdir -p backups
-docker compose cp api:/data/backups/snapshot.sqlite backups/snapshot.sqlite
+docker compose -f compose.production.yaml cp api:/data/backups/snapshot.sqlite backups/snapshot.sqlite
 ```
 
 Sortie attendue : `ok` et aucune ligne de violation FK. Choisir un nouveau nom
@@ -48,12 +57,12 @@ copie du volume courant avant la restauration. Exemple pour restaurer le snapsho
 validé présent dans `/data/backups/snapshot.sqlite` :
 
 ```sh
-docker compose stop api
-docker compose run --rm --no-deps --entrypoint sqlite3 api /data/backups/snapshot.sqlite 'PRAGMA quick_check; PRAGMA foreign_key_check;'
+docker compose -f compose.production.yaml stop api
+docker compose -f compose.production.yaml run --rm --no-deps --entrypoint sqlite3 api /data/backups/snapshot.sqlite 'PRAGMA quick_check; PRAGMA foreign_key_check;'
 # Continuer seulement si quick_check = ok et aucune violation FK.
-docker compose run --rm --no-deps --entrypoint /bin/sh api -ec 'cp /data/habits.sqlite /data/backups/before-restore.sqlite; rm -f /data/habits.sqlite-wal /data/habits.sqlite-shm; cp /data/backups/snapshot.sqlite /data/habits.sqlite'
-docker compose up --detach --wait
-docker compose exec -T api /usr/local/bin/habit-tracker healthcheck
+docker compose -f compose.production.yaml run --rm --no-deps --entrypoint /bin/sh api -ec 'cp /data/habits.sqlite /data/backups/before-restore.sqlite; rm -f /data/habits.sqlite-wal /data/habits.sqlite-shm; cp /data/backups/snapshot.sqlite /data/habits.sqlite'
+docker compose -f compose.production.yaml up --detach --wait
+docker compose -f compose.production.yaml exec -T api /usr/local/bin/habit-tracker healthcheck
 ```
 
 La suppression des sidecars n'a lieu qu'après arrêt gracieux de **tous** les
