@@ -13,6 +13,7 @@ par HA, sans copie dans `/config/www` ni ressource Lovelace à déclarer.
 
 Le dépôt public d'installation est
 [floriaaan/habit-tracker-ha](https://github.com/floriaaan/habit-tracker-ha).
+Première release : [v0.1.1](https://github.com/floriaaan/habit-tracker-ha/releases/tag/v0.1.1).
 Le backend `floriaaan/habits` reste privé ; le client est un sous-module verrouillé
 à `integrations/home-assistant/habit-tracker-ha`. Pour préparer le poste :
 

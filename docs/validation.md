@@ -247,3 +247,36 @@ Le poste local n'a pas démarré Docker/OrbStack : ces preuves Docker sont celle
 des runners GitHub. La publication de tags SemVer n'a pas été déclenchée ; sa
 politique est couverte par les tests. Le transport `docker save/load` ne conserve
 pas les attestations Buildx, comme indiqué dans container-publishing.md.
+
+## Dépôt HA public et sous-module — 2026-11-03
+
+- [floriaaan/habit-tracker-ha](https://github.com/floriaaan/habit-tracker-ha) créé
+  **public**, avec un commit racine sans parent et uniquement le client HA, sa carte,
+  dashboard exemple, traductions et fichiers de distribution. Export initial relu :
+  les fichiers du composant sont identiques, seuls les liens du manifest ciblent le
+  dépôt public. Aucun historique Git du backend transféré. La visibilité de
+  `floriaaan/habits` a été revérifiée **PRIVATE** après publication.
+- [HACS et Hassfest réussis](https://github.com/floriaaan/habit-tracker-ha/actions/runs/41672170932).
+  Le premier passage HACS demandait des topics GitHub ; ajoutés puis validateur
+  relancé avec succès, sans ignorer ce contrôle. Seul `brands` reste ignoré pour
+  cette distribution par dépôt personnalisé, hors catalogue HACS par défaut.
+- [Release v0.1.1](https://github.com/floriaaan/habit-tracker-ha/releases/tag/v0.1.1)
+  publiée sur le commit `050c062a2a4bfc874c7544d72689fd45592be0d7`, archive
+  `habit_tracker.zip` jointe. Même commit verrouillé en mode Git `160000` à
+  `integrations/home-assistant/habit-tracker-ha`, déclaré dans `.gitmodules`.
+- Clonage anonyme HTTPS du dépôt public et clonage neuf récursif du backend privé :
+  succès ; le sous-module récupère exactement le commit verrouillé. Depuis ce clone
+  neuf, **3 tests d'archives et 3 tests HA réels passent**, ces derniers avec le
+  binaire Rust local existant (sources Rust inchangées). L'absence du sous-module
+  provoque une erreur explicite avec la commande d'initialisation, sans créer
+  d'archive vide.
+- Installation par copie, `ha:sync` et `ha:sync:ssh` vérifiées avec configuration
+  temporaire/transport local : sources lues depuis le sous-module, fichiers
+  étrangers conservés, ancien prototype préservé. Aucun accès à un HA personnel.
+- [CI backend complète réussie](https://github.com/floriaaan/habits/actions/runs/41673137229) :
+  checkout récursif dans le job HA, 61 tests Rust, 3 tests HA, audit/deny, smoke natif
+  AMD64/ARM64 et publication GHCR. [Archives privées validées séparément](https://github.com/floriaaan/habits/actions/runs/41673137021),
+  avec 3 tests et sous-module initialisé. Les validateurs HACS/Hassfest résident
+  maintenant dans le dépôt public ; le backend conserve les tests avec l'API Rust.
+- `actionlint`, syntaxe JS et `git diff --check` : succès. Pas d'installation,
+  redémarrage ou configuration effectué sur le Home Assistant de l'opérateur.
