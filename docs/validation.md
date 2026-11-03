@@ -190,6 +190,8 @@ homelab réel, son proxy et ses credentials reste une opération de déploiement
   copiée dans le composant HACS, prototype dans `www`, temporaires nettoyés.
 
 Le dépôt source est privé. L'installation depuis l'API publique HACS et une
-publication publique ne sont pas testées/revendiquées. Le workflow Hassfest est
-prévu ; son résultat distant est à vérifier. Le validateur HACS est conditionné à
-un dépôt public. Le backend Rust n'a pas changé dans cette itération.
+publication publique ne sont pas testées/revendiquées. Les jobs **Hassfest et
+package ont réussi sur GitHub Actions**, [run 41666600516](https://github.com/floriaaan/habits/actions/runs/41666600516),
+après ajout de la dépendance directe `http` demandée par Hassfest. Le validateur
+HACS est ignoré tant que le dépôt reste privé. Le backend Rust n'a pas changé
+dans cette itération ; la CI Rust/Docker complète n'est pas assimilée à ce run.
