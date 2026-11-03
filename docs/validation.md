@@ -195,3 +195,55 @@ package ont réussi sur GitHub Actions**, [run 41666600516](https://github.com/f
 après ajout de la dépendance directe `http` demandée par Hassfest. Le validateur
 HACS est ignoré tant que le dépôt reste privé. Le backend Rust n'a pas changé
 dans cette itération ; la CI Rust/Docker complète n'est pas assimilée à ce run.
+
+## Optimisation CI — 2026-11-03
+
+Deux runs réels ont réussi et publié les deux plateformes dans GHCR :
+[cache froid 41668658747](https://github.com/floriaaan/habits/actions/runs/41668658747)
+et [cache chaud 41670603011](https://github.com/floriaaan/habits/actions/runs/41670603011).
+Référence : [41530809211](https://github.com/floriaaan/habits/actions/runs/41530809211).
+Durée totale : création du run jusqu'à la fin du dernier job, attente incluse.
+
+| Mesure | Avant | Nouveau, froid | Nouveau, chaud |
+| --- | ---: | ---: | ---: |
+| CI entière | 99 min 59 s | 9 min 30 s | 3 min 12 s |
+| `build-and-push` | 83 min 01 s | 48 s | 45 s |
+| Rust | 16 min 51 s | 3 min 38 s | 1 min 11 s |
+| Sécurité | incluse dans Rust | 8 min 35 s | 39 s |
+| Image + smoke AMD64 | recompilée avant publication | 7 min 14 s | 56 s |
+| Image + smoke ARM64 | QEMU dans publication | 5 min 27 s | 57 s |
+| Home Assistant | absent du run de référence | 1 min 14 s | 1 min 02 s |
+
+Les compilations d'images ont été déplacées dans une matrice native parallèle,
+incluse dans le total ; le gain ne vient pas seulement d'un renommage de job.
+Les logs de référence montrent 79 min 16 de compilation ARM64 sous QEMU contre
+4 min 37 en AMD64. Le nouveau step ARM64 complet prend 4 min 45 à froid, cache et
+export inclus. Le second run conserve les mêmes sources applicatives et Dockerfile,
+avec un renforcement de la garde d'événement du workflow. Il mesure la réutilisation
+du cache ; une modification Rust/dépendance provoquera les recompilations nécessaires.
+
+Preuves dans les deux runs :
+
+- fmt, Clippy tous targets/features `-D warnings`, **61 tests Rust**, build debug,
+  OpenAPI identique, frontières du domaine et **2 tests de politique de publication**.
+- Audit et deny exécutés : advisories/bans/licenses/sources OK, mêmes doublons
+  transitifs déjà documentés. Le second run restaure les deux outils depuis le
+  cache et ignore leur installation, sans ignorer leurs contrôles.
+- **3 tests HA réels** avec le binaire debug téléchargé du même run, sans Cargo
+  dans le job HA. Cache pip restauré au deuxième passage.
+- Build release natif et **smoke complet sur AMD64 et ARM64** : healthchecks,
+  refus sans token, PAT, événement idempotent, XP, non-root/read-only/capabilities,
+  logs sans token, sauvegarde puis restauration de la réalisation et du ledger.
+- Les deux compilations Docker sont `CACHED` au second passage. Les artefacts
+  d'images testées (~41–43 Mo chacun) sont chargés sans recompilation par le job
+  final, qui vérifie architecture/commit et inspecte le manifeste GHCR résultant :
+  `linux/amd64` et `linux/arm64` présents. SHA et `latest` publiés dans ces runs.
+- `actionlint` sur les deux workflows, tests Python locaux de publication,
+  `git diff --check` : succès. Les règles refusent PR/forks/schedule/tags invalides ;
+  une garde de contexte GitHub indépendante du script interdit aux PR d'atteindre
+  le job doté de `packages: write`.
+
+Le poste local n'a pas démarré Docker/OrbStack : ces preuves Docker sont celles
+des runners GitHub. La publication de tags SemVer n'a pas été déclenchée ; sa
+politique est couverte par les tests. Le transport `docker save/load` ne conserve
+pas les attestations Buildx, comme indiqué dans container-publishing.md.
