@@ -2,16 +2,17 @@
 
 ## Déploiement
 
-Pour une nouvelle installation, suivez le [README](../README.fr.md#installation--production)
+Pour une nouvelle installation, suivez le [README](../README.fr.md#installation)
 pour télécharger l'image GHCR et créer l'utilisateur. Les commandes ci-dessous
-utilisent le fichier autonome `compose.production.yaml`, sans build local :
+utilisent le `compose.yaml` de déploiement copié depuis ce guide, sans build local :
 
 ```sh
-docker compose -f compose.production.yaml pull
-docker compose -f compose.production.yaml up --detach --wait
+docker compose pull
+docker compose up --detach --wait
 ```
 
-`compose.yaml` reste réservé aux builds locaux et smoke tests. Le volume
+Le `compose.yaml` présent dans les sources du dépôt sert aux builds locaux et smoke tests ;
+ne pas le confondre avec le bloc GHCR du README. Le volume
 nommé local est initialisé avec les droits UID/GID 10001. Un bind mount alternatif
 doit être préparé par l'opérateur avec ce propriétaire et des permissions 0700.
 Ne jamais utiliser la base active sur un montage réseau. Les fichiers de base,
@@ -31,11 +32,11 @@ de destination est un argument local CLI, jamais une entrée HTTP ; la commande
 refuse un chemin déjà existant. Prévoir l'espace disque pour une copie complète.
 
 ```sh
-docker compose -f compose.production.yaml exec -T api mkdir -p /data/backups
-docker compose -f compose.production.yaml exec -T api /usr/local/bin/habit-tracker backup /data/backups/snapshot.sqlite
-docker compose -f compose.production.yaml exec -T api sqlite3 /data/backups/snapshot.sqlite 'PRAGMA quick_check; PRAGMA foreign_key_check;'
+docker compose exec -T api mkdir -p /data/backups
+docker compose exec -T api /usr/local/bin/habit-tracker backup /data/backups/snapshot.sqlite
+docker compose exec -T api sqlite3 /data/backups/snapshot.sqlite 'PRAGMA quick_check; PRAGMA foreign_key_check;'
 mkdir -p backups
-docker compose -f compose.production.yaml cp api:/data/backups/snapshot.sqlite backups/snapshot.sqlite
+docker compose cp api:/data/backups/snapshot.sqlite backups/snapshot.sqlite
 ```
 
 Sortie attendue : `ok` et aucune ligne de violation FK. Choisir un nouveau nom
@@ -57,12 +58,12 @@ copie du volume courant avant la restauration. Exemple pour restaurer le snapsho
 validé présent dans `/data/backups/snapshot.sqlite` :
 
 ```sh
-docker compose -f compose.production.yaml stop api
-docker compose -f compose.production.yaml run --rm --no-deps --entrypoint sqlite3 api /data/backups/snapshot.sqlite 'PRAGMA quick_check; PRAGMA foreign_key_check;'
+docker compose stop api
+docker compose run --rm --no-deps --entrypoint sqlite3 api /data/backups/snapshot.sqlite 'PRAGMA quick_check; PRAGMA foreign_key_check;'
 # Continuer seulement si quick_check = ok et aucune violation FK.
-docker compose -f compose.production.yaml run --rm --no-deps --entrypoint /bin/sh api -ec 'cp /data/habits.sqlite /data/backups/before-restore.sqlite; rm -f /data/habits.sqlite-wal /data/habits.sqlite-shm; cp /data/backups/snapshot.sqlite /data/habits.sqlite'
-docker compose -f compose.production.yaml up --detach --wait
-docker compose -f compose.production.yaml exec -T api /usr/local/bin/habit-tracker healthcheck
+docker compose run --rm --no-deps --entrypoint /bin/sh api -ec 'cp /data/habits.sqlite /data/backups/before-restore.sqlite; rm -f /data/habits.sqlite-wal /data/habits.sqlite-shm; cp /data/backups/snapshot.sqlite /data/habits.sqlite'
+docker compose up --detach --wait
+docker compose exec -T api /usr/local/bin/habit-tracker healthcheck
 ```
 
 La suppression des sidecars n'a lieu qu'après arrêt gracieux de **tous** les
@@ -77,8 +78,10 @@ un vrai arrêt/restauration/redémarrage sur son volume dédié.
 ## Logs et limites
 
 Logs JSON sur stdout : request_id, méthode, statut, durée et erreurs de catégorie.
-Pas d'Authorization, corps, claims, URL/query HTTP ou contenu SQL dans les logs
-applicatifs. Conserver les logs avec rétention raisonnable et accès restreint.
+Aucun Authorization, corps, claims, URL/query HTTP ou contenu SQL dans les logs
+HTTP. Exception explicite : au premier démarrage local, la ligne `local_bootstrap`
+contient le PAT initial, à conserver comme un secret. Conserver les logs avec
+rétention raisonnable et accès restreint.
 Les request IDs reçus ne sont pas reflétés, un UUID serveur est généré.
 
 Liveness ne teste pas la base ; readiness vérifie une requête SQLite après
@@ -93,7 +96,8 @@ ne remplace pas ces tests et doit également être opéré périodiquement.
 
 Voir [auth.md](auth.md) pour activer le mode local ou OIDC. Le mode disabled
 reste fermé, même pour un PAT valide. Ne pas journaliser les valeurs env ou la
-sortie du bootstrap ; Docker inspect/config peut exposer les envvars aux personnes
+sortie du bootstrap ailleurs ; son affichage automatique initial est sensible.
+Docker inspect/config peut exposer les envvars aux personnes
 ayant accès au moteur. Sauvegarder ENCRYPTION_KEY/ENCRYPTION_KEY_ID séparément.
 La ré-encryption des credentials et la rotation de clé ne sont pas automatisées :
 ne pas changer la clé en place sans migration contrôlée ou reconnexion des providers.

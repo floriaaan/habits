@@ -60,12 +60,15 @@ try:
         assert response.code == 401
         assert json.load(response)["error"]["code"] == "unauthorized"
     assert compose("exec", "-T", "api", "id", "-u").strip() == "10001"
-    # Bootstrap via the real CLI, then activate token-protected local mode.
-    issued = json.loads(compose("exec", "-T", "api", "/usr/local/bin/habit-tracker", "bootstrap-local", "UTC"))
-    token = issued["token"]
+    assert "local_bootstrap" not in compose("logs", "--no-color", "api")
+    # Activating local mode bootstraps once, without a separate CLI command.
     environment["AUTH_MODE"] = "local"
     compose("up", *build_arguments, "--detach", "--wait", "--wait-timeout", "90")
     url = "http://" + compose("port", "api", "8080").strip()
+    events = [json.loads(line) for line in compose("logs", "--no-color", "--no-log-prefix", "api").splitlines() if line.startswith("{")]
+    bootstraps = [event for event in events if event.get("event") == "local_bootstrap"]
+    assert len(bootstraps) == 1
+    token = bootstraps[0]["token"]
 
     def api(path, method="GET", payload=None, key=None):
         headers = {"Authorization": "Bearer " + token, "Content-Type": "application/json"}
@@ -97,10 +100,12 @@ try:
     url = "http://" + address
     assert api("/api/v1/entries/" + entry["id"])["id"] == entry["id"]
     assert api("/api/v1/gamification")["xp"] == 10
-    logs = compose("logs", "--no-color", "api")
+    logs = compose("logs", "--no-color", "--no-log-prefix", "api")
     assert "API listening" in logs and "request completed" in logs
     assert "smoke-test" not in logs  # Token must not appear in tracing output.
-    assert token not in logs
-    print("Docker smoke: OK (health/closed-auth/local-PAT/check-in/idempotence/XP/non-root/read-only/logs/backup/restore)")
+    events = [json.loads(line) for line in logs.splitlines() if line.startswith("{")]
+    assert sum(event.get("event") == "local_bootstrap" for event in events) == 1
+    assert all(token not in json.dumps(event) for event in events if event.get("event") != "local_bootstrap")
+    print("Docker smoke: OK (health/closed-auth/one-time-auto-bootstrap/local-PAT/check-in/idempotence/XP/non-root/read-only/logs/backup/restore)")
 finally:
     compose("down", "--volumes", "--remove-orphans")

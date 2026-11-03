@@ -308,3 +308,29 @@ pas les attestations Buildx, comme indiqué dans container-publishing.md.
 Docker/OrbStack n'était pas démarré sur le poste : la validation locale du nouveau
 Compose est statique. Aucun service de production ni Home Assistant personnel n'a
 été démarré, installé ou reconfiguré pour cette rédaction.
+
+## Bootstrap automatique et installation simplifiée — 2026-11-03
+
+Le mainteneur a remplacé le fichier de production par un bloc Compose intégré
+aux README EN/FR et demandé l'affichage automatique du premier PAT local.
+Voir [décision et exception de journalisation](decisions-auto-bootstrap.md).
+
+- `cargo test --locked --all-targets` : **64 tests réussis** (62 unitaires et
+  2 tests du vrai processus serveur). Les nouveaux tests prouvent une seule
+  émission atomique lors d'appels concurrents, un PAT hashé et fonctionnel,
+  le refus HTTP sans token, et aucun secret réémis au redémarrage ou après
+  expiration/révocation. Les modes disabled et OIDC n'émettent aucun PAT initial.
+- `cargo clippy --locked --all-targets --all-features -- -D warnings` et
+  `cargo build --locked --release` : succès sur le poste de développement.
+- Les blocs Compose extraits des README sont identiques et validés seuls avec
+  `docker compose --env-file /dev/null -f … config --format json` : image GHCR,
+  aucun build, mode local, toutes les variables runtime présentes, non-root,
+  rootfs read-only, capabilities supprimées et port loopback. Les liens locaux
+  et blocs Markdown sont valides. `compose.production.yaml` est supprimé.
+- **2 tests de politique CI et 3 tests d'export HACS réussis** ; frontières du
+  domaine et syntaxe Python du smoke Docker vérifiées. Le smoke utilise maintenant
+  le token émis au démarrage et tolère sa présence uniquement dans l'événement
+  `local_bootstrap`, une seule fois malgré l'arrêt/restauration/redémarrage.
+
+Les tests de démarrage utilisent des bases et ports loopback temporaires, sans
+fournisseur externe. Aucun secret réel ni Home Assistant personnel n'est utilisé.

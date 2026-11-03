@@ -1,5 +1,5 @@
 use habit_tracker::{
-    config::Config,
+    config::{AuthMode, Config},
     http::routes::{ApiDoc, router_with_identity},
     infrastructure::database::Store,
 };
@@ -111,7 +111,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
     }
     let listener = tokio::net::TcpListener::bind(config.listen_addr).await?;
     store.local_user("UTC").await?;
-    tracing::info!(address = %config.listen_addr, auth = ?config.auth_mode, "API listening");
     let runtime =
         habit_tracker::infrastructure::integrations::IntegrationRuntime::from_env(store.clone())?;
     let oidc = if let Some(oidc) = config.oidc {
@@ -138,11 +137,25 @@ async fn main() -> Result<(), Box<dyn Error>> {
     } else {
         None
     };
+    if config.auth_mode == AuthMode::Tokens
+        && let Some(issued) = store.bootstrap_local_if_needed("UTC").await?
+    {
+        // Explicit one-time installation output; never log request/provider secrets.
+        println!(
+            "{}",
+            serde_json::json!({
+                "event": "local_bootstrap",
+                "token": issued.token,
+                "metadata": issued.metadata,
+            })
+        );
+    }
     let worker = if runtime.ha_url.is_some() || runtime.strava.is_some() {
         Some(tokio::spawn(runtime.clone().worker()))
     } else {
         None
     };
+    tracing::info!(address = %config.listen_addr, auth = ?config.auth_mode, "API listening");
     axum::serve(
         listener,
         router_with_identity(store.clone(), config.auth_mode, runtime, oidc),

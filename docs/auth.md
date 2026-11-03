@@ -10,24 +10,42 @@ droits. NPMplus termine HTTPS ; garder `/health/*` internes.
 `AUTH_MODE=local` (alias `tokens`) accepte uniquement les PAT et tokens de comptes
 de service du tenant singleton `(urn:habit-tracker:local, default)`. L'UUID est
 persisté en SQLite ; aucun utilisateur anonyme ni secret admin permanent n'est
-créé. Le serveur provisionne ce tenant à son premier démarrage, sans token.
+créé. Au premier démarrage en mode local, le serveur crée le tenant (fuseau UTC)
+et émet automatiquement un PAT initial avec tous les scopes, valable **24 heures**.
+Une ligne JSON stdout `event=local_bootstrap` affiche `token` et `metadata`
+(identifiants du token/utilisateur, scopes, expiration), même si `RUST_LOG=error`.
+Elle apparaît dans `docker compose logs api` pour le Compose GHCR copié du README.
+Cette ligne est une exception explicite à l'absence de secrets dans les logs :
+protéger les journaux et utiliser ensuite des tokens dédiés aux clients.
+Seule l'empreinte est stockée en base ; aucun endpoint ne restitue le secret.
 
-Exécuter le bootstrap local sur la même base que le serveur :
+L'émission, le marqueur administrateur et l'audit sont atomiques. Un redémarrage,
+une expiration, une révocation ou un démarrage concurrent n'émettent pas d'autre
+PAT initial. Aucun bootstrap automatique en mode `disabled` ou `oidc`, ni via
+healthcheck, backup ou autre commande CLI. Les routes privées restent fermées
+sans Bearer valide.
+
+Pour choisir le fuseau du tenant et recevoir le token hors des logs serveur,
+la CLI reste facultativement utilisable **avant** le premier démarrage :
 
 ```sh
 cargo run --locked -- bootstrap-local Europe/Paris
-# Ou sur le volume de l'API Compose déjà démarrée :
-docker compose exec api /usr/local/bin/habit-tracker bootstrap-local Europe/Paris
 ```
 
-Le premier bootstrap applique le fuseau fourni au tenant local, même s'il a été
-provisionné en UTC au démarrage. Chaque habitude porte aussi son propre fuseau IANA. La
-sortie JSON contient le token et ses métadonnées : tous les scopes, expiration
-sous 24 h, secret affiché à l'émission uniquement. Le conserver hors des logs et
-créer ensuite des tokens adaptés aux clients. Répéter le bootstrap est refusé.
-Configurer ensuite `AUTH_MODE=local` pour le processus serveur (avec Compose,
-recréer le service après modification de cette variable).
-La récupération après perte/expiration exige l'accès local à la CLI et l'UUID :
+Chaque habitude porte aussi son propre fuseau IANA. Un bootstrap CLI déjà fait
+empêche l'émission automatique ; répéter la commande est refusé.
+Un crash entre la validation SQLite et l'affichage peut perdre le secret initial :
+utiliser la récupération CLI, sans supprimer le marqueur ni la base.
+La récupération après perte/expiration exige l'accès local à la CLI et l'UUID
+`metadata.user_id` de la sortie initiale. Si cette sortie est perdue, lire l'UUID
+stable sur le volume local via SQLite :
+
+```sh
+docker compose exec -T api sqlite3 /data/habits.sqlite \
+  "SELECT id FROM users WHERE issuer = 'urn:habit-tracker:local' AND subject = 'default';"
+```
+
+Émettre ensuite un token avec les scopes souhaités :
 
 ```sh
 cargo run --locked -- token-create "${USER_ID:?}" \

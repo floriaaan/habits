@@ -14,125 +14,93 @@ Utilisez l'API depuis vos scripts ou connectez
 Pocket ID/OIDC, Strava et les notifications sortantes vers HA sont facultatifs.
 Le backend ne fournit pas d'interface web autonome.
 
-## Installation — production
+## Installation
 
-### 1. Récupérer le fichier Compose de production
+Avec Docker et Docker Compose, enregistrez ce bloc dans un **`compose.yaml`** dans
+votre dossier de déploiement. L'image GHCR est disponible pour AMD64 et ARM64 ;
+aucune compilation n'est nécessaire. Toutes les variables runtime sont définies ;
+laissez les groupes optionnels vides si vous ne les utilisez pas.
 
-Prérequis : Docker Engine avec Docker Compose et un accès à l'image GHCR.
-Téléchargez [compose.production.yaml](compose.production.yaml) dans votre dossier
-de déploiement. Ce fichier suffit : ni Rust, ni clonage des sources, ni build
-d'image. Exécutez les commandes suivantes depuis ce dossier.
+```yaml
+services:
+  api:
+    image: ghcr.io/floriaaan/habits:${HABIT_TRACKER_TAG:-latest}
+    user: "10001:10001"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    init: true
+    environment:
+      LISTEN_ADDR: 0.0.0.0:8080
+      DATABASE_PATH: /data/habits.sqlite
+      AUTH_MODE: ${AUTH_MODE:-local}
+      OIDC_ISSUER: ${OIDC_ISSUER:-}
+      OIDC_AUDIENCE: ${OIDC_AUDIENCE:-}
+      OIDC_JWKS_URL: ${OIDC_JWKS_URL:-}
+      OIDC_ALLOWED_ALGORITHMS: ${OIDC_ALLOWED_ALGORITHMS:-}
+      OIDC_ACCESS_TOKEN_TYP: ${OIDC_ACCESS_TOKEN_TYP:-}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+      ENCRYPTION_KEY_ID: ${ENCRYPTION_KEY_ID:-}
+      STRAVA_CLIENT_ID: ${STRAVA_CLIENT_ID:-}
+      STRAVA_CLIENT_SECRET: ${STRAVA_CLIENT_SECRET:-}
+      STRAVA_REDIRECT_URI: ${STRAVA_REDIRECT_URI:-}
+      STRAVA_WEBHOOK_VERIFY_TOKEN: ${STRAVA_WEBHOOK_VERIFY_TOKEN:-}
+      STRAVA_WEBHOOK_PATH_TOKEN: ${STRAVA_WEBHOOK_PATH_TOKEN:-}
+      STRAVA_SUBSCRIPTION_ID: ${STRAVA_SUBSCRIPTION_ID:-}
+      STRAVA_ATHLETE_CAPACITY: ${STRAVA_ATHLETE_CAPACITY:-}
+      STRAVA_MULTI_ATHLETE_APPROVED: ${STRAVA_MULTI_ATHLETE_APPROVED:-}
+      HOME_ASSISTANT_URL: ${HOME_ASSISTANT_URL:-}
+      HOME_ASSISTANT_ALLOW_HTTP: ${HOME_ASSISTANT_ALLOW_HTTP:-}
+      RUST_LOG: ${RUST_LOG:-habit_tracker=info,tower_http=info}
+    ports:
+      - "${HOST_BIND:-127.0.0.1}:${HOST_PORT:-8080}:8080"
+    volumes:
+      - habit_data:/data
+    healthcheck:
+      test: [CMD, /usr/local/bin/habit-tracker, healthcheck]
+      interval: 15s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    restart: unless-stopped
+    stop_grace_period: 15s
+    mem_limit: 256m
+    cpus: 1.0
+    pids_limit: 128
 
-L'image `ghcr.io/floriaaan/habits:latest` est disponible pour AMD64 et ARM64.
-Docker sélectionne automatiquement la bonne plateforme.
+volumes:
+  habit_data:
+    driver: local
+```
 
-### 2. Télécharger l'image
-
-Si le package GHCR est privé, connectez-vous d'abord :
+Si le package GHCR est privé, faites d'abord `docker login ghcr.io` avec votre
+identifiant GitHub et un PAT GitHub classique doté de `read:packages`.
+Puis lancez :
 
 ```sh
-docker login ghcr.io
+docker compose up --detach --wait
+docker compose logs api
 ```
 
-Renseignez votre identifiant GitHub puis, à l'invite du mot de passe, un personal
-access token GitHub **classique** avec `read:packages` et un accès au package.
-Ce credential de registre est distinct du token API Habit Tracker. Voir le
-[guide d'authentification GHCR](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry#authenticating-to-the-container-registry).
+Au premier démarrage en mode `local`, le backend crée l'utilisateur et affiche
+une ligne JSON **`event: local_bootstrap`** contenant `token` et `metadata.user_id`.
+Aucune commande de bootstrap n'est nécessaire. Ce token expire après **24 heures** :
+conservez-le et créez un token dédié pour vos clients via la [gestion des tokens](docs/auth.md).
+Il n'est jamais réaffiché ni régénéré au redémarrage, même expiré ou révoqué.
+Les logs de ce premier lancement contiennent donc un secret ; réservez leur accès
+aux opérateurs. La base ne stocke que l'empreinte du token.
 
-```sh
-docker compose -f compose.production.yaml pull
-```
+L'API écoute sur `127.0.0.1:8080` et exige un Bearer valide. Pour un accès distant,
+utilisez votre reverse proxy HTTPS ; les healthchecks restent internes et SSE doit
+passer sans buffering. HA doit pouvoir joindre l'URL du backend depuis son serveur :
+[installation HACS](https://github.com/floriaaan/habit-tracker-ha/blob/main/README.fr.md#installation).
 
-### 3. Créer l'utilisateur local et lancer l'API
-
-Sur une **nouvelle installation**, exécutez le bootstrap une seule fois, puis
-démarrez le service :
-
-```sh
-docker compose -f compose.production.yaml run --rm --no-deps api bootstrap-local Europe/Paris
-docker compose -f compose.production.yaml up --detach --wait
-docker compose -f compose.production.yaml exec -T api /usr/local/bin/habit-tracker healthcheck
-```
-
-Remplacez `Europe/Paris` par votre fuseau IANA si nécessaire. Le bootstrap affiche
-un JSON avec `token` et `metadata.user_id`. Conservez le token dans un gestionnaire
-de secrets : sa valeur n'est affichée qu'à l'émission et expire après **24 heures**.
-Ne relancez pas le bootstrap sur une installation existante ; utilisez les commandes
-ou l'API de gestion des tokens. Les migrations sont appliquées automatiquement.
-
-Le Compose de production choisit `AUTH_MODE=local` par défaut : un utilisateur
-persistant, avec un Bearer valide pour chaque requête API privée. Pocket ID n'est
-pas nécessaire. `AUTH_MODE=disabled` ferme les routes privées ; il n'autorise jamais
-un accès anonyme.
-
-### 4. Connecter les clients
-
-L'API écoute sur `http://127.0.0.1:8080` sur l'hôte Docker. Pour Home Assistant ou
-des clients distants, placez-la derrière votre reverse proxy HTTPS, comme NPMplus :
-
-- Un proxy sur l'hôte peut cibler `127.0.0.1:8080`. Un proxy en conteneur doit
-  rejoindre le réseau Docker de l'API et peut cibler `api:8080`.
-- Gardez `/health/*` internes. Pour `/api/v1/dashboard/events`, désactivez le
-  buffering et autorisez les connexions longues (`proxy_read_timeout 75s` avec Nginx).
-- Donnez à HA une URL du backend accessible **depuis HA**, sans `/api/v1`.
-  Suivez le [guide d'installation HA](https://github.com/floriaaan/habit-tracker-ha/blob/main/README.fr.md#installation).
-
-Pour créer une première habitude, chargez le token du bootstrap dans `HABIT_TOKEN`
-depuis votre gestionnaire de secrets, puis exécutez sur l'hôte Docker :
-
-```sh
-curl --fail http://127.0.0.1:8080/api/v1/habits \
-  -H "Authorization: Bearer $HABIT_TOKEN" \
-  -H 'Content-Type: application/json' \
-  --data '{"name":"Lecture","category":"mind","kind":"boolean","unit":"count","target":1,"timezone":"Europe/Paris"}'
-```
-
-Pour HA au quotidien, émettez un token dédié avec `habits:read`, `statistics:read`
-et `entries:write`. Définissez `HABIT_USER_ID` avec le `metadata.user_id` du bootstrap,
-et `HABIT_EXPIRES_AT` avec une date UTC RFC 3339 future, dans les 365 prochains jours :
-
-```sh
-docker compose -f compose.production.yaml exec -T api \
-  /usr/local/bin/habit-tracker token-create "${HABIT_USER_ID:?}" \
-  'habits:read,statistics:read,entries:write' "${HABIT_EXPIRES_AT:?}"
-```
-
-Utilisez le champ `token` obtenu dans HA. C'est un token Habit Tracker, pas un token
-GitHub ni un token longue durée de HA. Voir [authentification et rotation](docs/auth.md)
-pour les autres clients.
-
-### Configuration, mises à jour et données
-
-Un `.env` facultatif, placé à côté du fichier de production, peut modifier ces défauts :
-
-```dotenv
-AUTH_MODE=local
-HABIT_TRACKER_TAG=latest
-HOST_BIND=127.0.0.1
-HOST_PORT=8080
-```
-
-Un tag publié `sha-<commit-complet>` permet de figer une version. La
-[référence de configuration](.env.example) liste les options OIDC et connecteurs ;
-le Compose de production définit déjà l'adresse et le chemin internes de la base.
-Si vous copiez `.env.example`, choisissez `AUTH_MODE=local` pour ce parcours :
-son réglage initial laisse les routes privées fermées.
-Strava et les notifications sortantes HA nécessitent une configuration supplémentaire ;
-la lecture et les actions depuis HA ne nécessitent pas ce connecteur sortant.
-
-Pour mettre à jour, sauvegardez la base puis téléchargez l'image et recréez le service :
-
-```sh
-docker compose -f compose.production.yaml pull
-docker compose -f compose.production.yaml up --detach --wait
-docker compose -f compose.production.yaml logs --tail=100 api
-```
-
-SQLite réside dans le volume local `habit_data`, monté dans `/data`. `down` le conserve ;
-`down --volumes` le supprime. La base active doit rester sur disque local.
-Le [guide de sauvegarde et restauration](docs/operations.md) décrit les snapshots
-SQLite cohérents. Le conteneur utilise l'UID/GID 10001, un rootfs en lecture seule
-et aucune capability.
+OIDC, Strava et les notifications sortantes HA sont facultatifs ; leurs paramètres
+se configurent dans le bloc ou via `.env`. Voir [authentification](docs/auth.md) et
+[connecteurs](docs/integrations.md). Les données restent dans `habit_data` ;
+`down --volumes` les supprime. Pour mettre à jour : [sauvegardez](docs/operations.md),
+puis faites `docker compose pull && docker compose up --detach --wait`.
 
 ## Développement
 
@@ -156,7 +124,6 @@ les sources montées. Aucune image de développement à construire, ni Rust à i
 sur l'hôte.
 
 ```sh
-task dev:bootstrap TIMEZONE=Europe/Paris   # Une seule fois, sur la base de développement
 AUTH_MODE=local task dev
 ```
 
@@ -179,7 +146,6 @@ Installez Rust **1.99.1**, un compilateur C et CMake. Les dépendances sont fix�
 dans `Cargo.lock`. `cargo run` ne charge pas `.env` ; exportez les variables nécessaires.
 
 ```sh
-cargo run --locked -- bootstrap-local Europe/Paris
 AUTH_MODE=local cargo run --locked
 cargo fmt --all -- --check
 cargo clippy --locked --all-targets --all-features -- -D warnings
@@ -187,8 +153,7 @@ cargo test --locked --all-targets
 cargo build --locked --release
 ```
 
-`compose.yaml` construit l'image localement ; `compose.production.yaml` utilise
-seulement GHCR. `python3 scripts/docker_smoke.py` teste un build et un volume
+Le `compose.yaml` du dépôt construit localement ; le bloc ci-dessus utilise GHCR. `python3 scripts/docker_smoke.py` teste un build et un volume
 temporaires distincts. La CI vérifie aussi audit/deny, OpenAPI, les frontières du
 domaine et les deux plateformes d'images natives.
 

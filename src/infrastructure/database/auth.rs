@@ -166,6 +166,18 @@ impl Store {
         Ok(actor)
     }
     pub async fn bootstrap_local(&self, timezone: &str) -> Result<IssuedToken, DomainError> {
+        self.bootstrap_local_if_needed(timezone)
+            .await?
+            .ok_or(DomainError::Validation(
+                "local administrator already bootstrapped; use token-create for local recovery",
+            ))
+    }
+
+    /// Returns the one-time credential only after its hash and audit are committed.
+    pub async fn bootstrap_local_if_needed(
+        &self,
+        timezone: &str,
+    ) -> Result<Option<IssuedToken>, DomainError> {
         let user = self.local_user(timezone).await?;
         let mut tx = self
             .pool
@@ -178,9 +190,8 @@ impl Store {
             .await
             .map_err(persistence)?;
         if admin {
-            return Err(DomainError::Validation(
-                "local administrator already bootstrapped; use token-create for local recovery",
-            ));
+            tx.commit().await.map_err(persistence)?;
+            return Ok(None);
         }
         sqlx::query("UPDATE users SET is_admin = 1, timezone = ? WHERE id = ?")
             .bind(timezone)
@@ -201,7 +212,7 @@ impl Store {
         .await?;
         audit(&mut tx, user, "admin.bootstrap", AuditTarget::User).await?;
         tx.commit().await.map_err(persistence)?;
-        Ok(token)
+        Ok(Some(token))
     }
     pub async fn authenticate_token(&self, token: &str) -> Result<Principal, DomainError> {
         if token.len() != 46 || !token.starts_with("ht_") {
@@ -470,6 +481,79 @@ mod tests {
     #![allow(clippy::unwrap_used)]
     use super::*;
     use crate::infrastructure::database::tests::{Fixture, fixture_principal};
+    #[tokio::test]
+    async fn local_bootstrap_is_atomic_one_time_and_never_recovers_tokens_automatically() {
+        let f = Fixture::new().await;
+        let (first, concurrent) = tokio::join!(
+            f.store.bootstrap_local_if_needed("Europe/Paris"),
+            f.store.bootstrap_local_if_needed("Europe/Paris"),
+        );
+        let issued: Vec<_> = [first.unwrap(), concurrent.unwrap()]
+            .into_iter()
+            .flatten()
+            .collect();
+        assert_eq!(issued.len(), 1);
+        let issued = &issued[0];
+        let actor = f
+            .store
+            .authenticate_local_token(&issued.token)
+            .await
+            .unwrap();
+        assert_eq!(actor.scopes, Scope::all());
+        assert!(issued.metadata.expires_at > Utc::now());
+        assert!(issued.metadata.expires_at <= Utc::now() + chrono::Duration::hours(24));
+        let timezone: String = sqlx::query_scalar("SELECT timezone FROM users WHERE id = ?")
+            .bind(actor.user_id.0.to_string())
+            .fetch_one(&f.store.pool)
+            .await
+            .unwrap();
+        assert_eq!(timezone, "Europe/Paris");
+        assert!(f.store.bootstrap_local("UTC").await.is_err());
+        let hash: Vec<u8> = sqlx::query_scalar("SELECT token_hash FROM access_tokens WHERE id = ?")
+            .bind(issued.metadata.id.to_string())
+            .fetch_one(&f.store.pool)
+            .await
+            .unwrap();
+        assert_eq!(hash, token_hash(&issued.token));
+        sqlx::query("UPDATE access_tokens SET expires_at = ? WHERE id = ?")
+            .bind(Utc::now() - chrono::Duration::seconds(1))
+            .bind(issued.metadata.id.to_string())
+            .execute(&f.store.pool)
+            .await
+            .unwrap();
+        assert!(
+            f.store
+                .bootstrap_local_if_needed("UTC")
+                .await
+                .unwrap()
+                .is_none()
+        );
+        f.store
+            .revoke_token(&actor, issued.metadata.id)
+            .await
+            .unwrap();
+        assert!(
+            f.store
+                .bootstrap_local_if_needed("UTC")
+                .await
+                .unwrap()
+                .is_none()
+        );
+        let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM access_tokens WHERE user_id = ?")
+            .bind(actor.user_id.0.to_string())
+            .fetch_one(&f.store.pool)
+            .await
+            .unwrap();
+        assert_eq!(count, 1);
+        let bootstraps: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM auth_audit WHERE user_id = ? AND action = 'admin.bootstrap'",
+        )
+        .bind(actor.user_id.0.to_string())
+        .fetch_one(&f.store.pool)
+        .await
+        .unwrap();
+        assert_eq!(bootstraps, 1);
+    }
     #[tokio::test]
     async fn tokens_are_hashed_scoped_expiring_rotatable_and_tenant_bound() {
         let f = Fixture::new().await;
