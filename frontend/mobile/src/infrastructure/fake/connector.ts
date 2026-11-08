@@ -266,12 +266,43 @@ export class FakeHabitsConnector implements HabitsConnector {
   }
   async updateHabit(id: string, input: M.HabitVersion) {
     this.check()
-    this.find(this.habits, id)
-    if (input.effective_from <= today())
+    const habit = this.find(this.habits, id)
+    const now = new Date(),
+      parts = new Intl.DateTimeFormat('en', {
+        timeZone: habit.timezone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).formatToParts(now)
+    const get = (type: string) => parts.find((p) => p.type === type)!.value
+    const localToday = `${get('year')}-${get('month')}-${get('day')}`
+    const max = new Date(localToday + 'T12:00:00Z')
+    max.setUTCDate(max.getUTCDate() + 366)
+    if (
+      habit.archived_at ||
+      input.effective_from <= localToday ||
+      input.effective_from > max.toISOString().slice(0, 10) ||
+      (habit.period === 'weekly' &&
+        new Date(input.effective_from + 'T12:00:00Z').getUTCDay() !== 1) ||
+      input.definition.kind !== habit.kind ||
+      input.definition.unit !== habit.unit ||
+      input.definition.timezone !== habit.timezone ||
+      (input.definition.period ?? 'daily') !== habit.period
+    )
       throw new ApiError(
         'validation_error',
-        'La modification doit prendre effet dans le futur.',
+        'La modification doit respecter la période et prendre effet dans le futur.',
         422,
+      )
+    if (
+      this.versions
+        .get(id)!
+        .some((v) => v.effective_from === input.effective_from)
+    )
+      throw new ApiError(
+        'conflict',
+        'Une modification existe déjà pour cette date.',
+        409,
       )
     this.versions.get(id)!.push(clone(input))
     return clone(input)

@@ -20,3 +20,5 @@ Les ADR historiques conservent les décisions originales et signalent les évolu
 - [ADR-014 — Animations HA et observabilité](ADR-014-observability-ha-polish.md)
 - [ADR-015 — Valeur directe des verres et animations](ADR-015-glass-value.md)
 - [ADR-016 — Navigation mobile avec Expo Router](ADR-016-mobile-expo-router.md)
+
+- [ADR-017 — Comptes e-mail et sessions mobiles](ADR-017-mobile-accounts.md)

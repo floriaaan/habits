@@ -1,5 +1,9 @@
 import { LinearGradient } from 'expo-linear-gradient'
-import { router } from 'expo-router'
+import {
+  MotionCard,
+  useTabCardNavigation,
+  useTabMotionScroll,
+} from '../../shared/motion/TabCardMotion'
 import {
   ActivityIndicator,
   Pressable,
@@ -23,17 +27,23 @@ export function WelcomeScreen() {
     insets = useDeviceInsets(),
     { width } = useWindowDimensions(),
     { status } = useApp()
+  const navigate = useTabCardNavigation()
+  const motionScroll = useTabMotionScroll('/')
   const radius = deviceCornerRadius(insets.top, width),
     restoring = status === 'restoring'
   return (
     <View style={{ flex: 1, backgroundColor: theme.canvas }}>
       <View style={styles.frame}>
         <ScrollView
+          onScroll={motionScroll}
+          scrollEventThrottle={16}
           showsVerticalScrollIndicator={false}
           contentInsetAdjustmentBehavior="never"
           contentContainerStyle={{ flexGrow: 1, padding: 6 }}
         >
-          <View
+          <MotionCard
+            screen="/"
+            role="primary"
             style={[
               styles.main,
               {
@@ -58,9 +68,12 @@ export function WelcomeScreen() {
             <Copy style={{ color: theme.secondary, fontSize: 14 }}>
               Commencez simplement, ajustez au fil des jours.
             </Copy>
-          </View>
+          </MotionCard>
         </ScrollView>
-        <View
+        <MotionCard
+          screen="/"
+          role="welcome-footer"
+          surfaceOrder={1}
           style={[
             styles.footer,
             {
@@ -76,7 +89,7 @@ export function WelcomeScreen() {
             accessibilityRole="button"
             accessibilityState={{ disabled: restoring, busy: restoring }}
             disabled={restoring}
-            onPress={() => router.push('/login')}
+            onPress={() => navigate('/login', '/')}
             style={({ pressed }) => [
               styles.button,
               {
@@ -98,7 +111,7 @@ export function WelcomeScreen() {
               Se connecter
             </Copy>
           </Pressable>
-        </View>
+        </MotionCard>
       </View>
     </View>
   )

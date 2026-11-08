@@ -2,11 +2,7 @@ import type { JournalHistory } from '../../../application/journal'
 import { shiftDay } from '../../../domain/calendar'
 import type { DashboardHabit, Entry } from '../../../domain/models'
 
-export function weekDays(date: string) {
-  const weekday = new Date(date + 'T12:00:00Z').getUTCDay()
-  const monday = shiftDay(date, -((weekday + 6) % 7))
-  return Array.from({ length: 7 }, (_, i) => shiftDay(monday, i))
-}
+export { weekDays } from '../../../domain/calendar'
 export function swipedDay(
   date: string,
   earliest: string,
@@ -21,6 +17,7 @@ export function swipedDay(
 export function journalDay(history: JournalHistory[], date: string) {
   const items: DashboardHabit[] = [],
     unavailable: string[] = []
+  const resting: DashboardHabit[] = []
   const events: { entry: Entry; item: DashboardHabit }[] = []
   for (const record of history) {
     const definition = record.versions
@@ -65,6 +62,20 @@ export function journalDay(history: JournalHistory[], date: string) {
         }
       } else unavailable.push(record.item.habit.name)
     }
+    if (
+      record.rests.some((rest) => rest.local_date === date) &&
+      (item || definition)
+    ) {
+      resting.push(
+        item ?? {
+          ...record.item,
+          habit: { ...record.item.habit, ...definition! },
+          local_date: date,
+          eligible: false,
+          actionable: false,
+        },
+      )
+    }
     if (item) items.push(item)
     for (const entry of record.entries.filter((e) => e.local_date === date)) {
       // Historical units and names must not be inferred from today's definition.
@@ -83,5 +94,5 @@ export function journalDay(history: JournalHistory[], date: string) {
       Date.parse(a.entry.occurred_at) - Date.parse(b.entry.occurred_at) ||
       a.entry.id.localeCompare(b.entry.id),
   )
-  return { items, events, unavailable }
+  return { items, events, unavailable, resting }
 }

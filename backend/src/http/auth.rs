@@ -110,6 +110,7 @@ pub enum SessionMode {
     PersonalAccessToken,
     ServiceAccount,
     OidcAccessToken,
+    MobileSession,
 }
 
 #[utoipa::path(get, path = "/api/v1/session", security(("bearer" = [])), responses((status = 200, body = Session), (status = 401, body = ErrorEnvelope)))]
@@ -120,6 +121,7 @@ pub(super) async fn session(Extension(actor): Extension<Principal>) -> Json<Sess
             IdentityMode::PersonalAccessToken => SessionMode::PersonalAccessToken,
             IdentityMode::ServiceAccount => SessionMode::ServiceAccount,
             IdentityMode::OidcAccessToken => SessionMode::OidcAccessToken,
+            IdentityMode::MobileSession => SessionMode::MobileSession,
         },
         scopes: actor.scopes,
     })

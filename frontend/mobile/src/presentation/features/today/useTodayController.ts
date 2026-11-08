@@ -1,6 +1,14 @@
+import { router } from 'expo-router'
+import { usePrepareNativeTabMotion } from '../../shared/motion/TabCardMotion'
 import { randomUUID } from 'expo-crypto'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AccessibilityInfo, Animated, Easing, PanResponder } from 'react-native'
+import {
+  AccessibilityInfo,
+  Alert,
+  Animated,
+  Easing,
+  PanResponder,
+} from 'react-native'
 import { useDashboardQuery } from '../../../application/habit-queries'
 import { loadJournal } from '../../../application/journal'
 import { useApp } from '../../../application/providers'
@@ -12,6 +20,8 @@ import { journalDay, swipedDay } from './today-model'
 
 export function useTodayController() {
   const { runtime, session } = useApp()
+  const prepare = usePrepareNativeTabMotion()
+  const canManageRest = !!session?.scopes.includes('habits:write')
   const canRead =
     !!session?.scopes.includes('habits:read') &&
     !!session?.scopes.includes('statistics:read') &&
@@ -37,6 +47,9 @@ export function useTodayController() {
   )
   const day =
     selected && history.data ? journalDay(history.data, selected) : null
+  const [restRemoving, setRestRemoving] = useState<string | null>(null)
+  const [restCommitted, setRestCommitted] = useState(false)
+  const [restFeedback, setRestFeedback] = useState<DashboardHabit | null>(null)
   const [feedbackId, setFeedbackId] = useState<string | null>(null)
   const pending =
     day?.items.filter(
@@ -90,6 +103,7 @@ export function useTodayController() {
     return () => animation.stop()
   }, [selected, reduceMotion, transition])
   function choose(date: string) {
+    if (writing.current) return
     setFeedbackId(null)
     direction.current = selected && date < selected ? -1 : 1
     setSelection(date)
@@ -176,12 +190,99 @@ export function useTodayController() {
       writing.current = false
     }
   }
+  function openRest(item: DashboardHabit) {
+    if (writing.current || !canManageRest || !selected) return
+    prepare(`/rest/${item.habit.id}`, '/today')
+    router.push({
+      pathname: '/rest/[id]',
+      params: { id: item.habit.id, date: selected, from: 'today' },
+    })
+  }
+  function openHabitMenu(item: DashboardHabit) {
+    if (writing.current) return
+    Alert.alert(item.habit.name, undefined, [
+      {
+        text: 'Ouvrir l’habitude',
+        onPress: () => {
+          prepare(`/habit/${item.habit.id}`, '/today')
+          router.push({
+            pathname: '/habit/[id]',
+            params: { id: item.habit.id },
+          })
+        },
+      },
+      ...(canManageRest
+        ? [{ text: 'Repos ce jour', onPress: () => openRest(item) }]
+        : []),
+      { text: 'Annuler', style: 'cancel' },
+    ])
+  }
+  async function removeRest(item: DashboardHabit) {
+    if (writing.current || !canManageRest || !selected) return false
+    writing.current = true
+    setRestCommitted(false)
+    setRestRemoving(item.habit.id)
+    setRestFeedback(item)
+    setNotice('')
+    let success = false
+    try {
+      await mutation.mutateAsync({
+        run: () => runtime.connector.removeRest(item.habit.id, selected),
+        resources: [
+          'habits',
+          'dashboard',
+          'entries',
+          'statistics',
+          'gamification',
+        ],
+      })
+      success = true
+      setRestCommitted(true)
+      return true
+    } catch (e) {
+      setNotice(errorMessage(e))
+      return false
+    } finally {
+      if (!success) {
+        writing.current = false
+        setRestRemoving(null)
+        setRestFeedback(null)
+      }
+    }
+  }
+  function finishRemoveRest() {
+    writing.current = false
+    setRestRemoving(null)
+    setRestFeedback(null)
+    setRestCommitted(false)
+  }
+  // A refetch error may unmount the button before its feedback finishes.
+  // Releasing the write lock belongs to the controller, not the button lifetime.
+  useEffect(() => {
+    if (!restCommitted) return
+    const timer = setTimeout(finishRemoveRest, 900)
+    return () => clearTimeout(timer)
+  }, [restCommitted])
+  const resting = [...(day?.resting ?? [])]
+  if (
+    restFeedback &&
+    restFeedback.local_date === selected &&
+    !resting.some((i) => i.habit.id === restFeedback.habit.id)
+  )
+    resting.push(restFeedback)
   const blocked =
     historical ||
+    !!restRemoving ||
     mutation.isPending ||
     !!error ||
     !session?.scopes.includes('entries:write')
   return {
+    canManageRest,
+    openHabitMenu,
+    resting,
+    removeRest,
+    finishRemoveRest,
+    restRemoving,
     finishQuickAction: () => setFeedbackId(null),
     isDemo: !!runtime.fake,
     canCreate: !!session?.scopes.includes('habits:write'),

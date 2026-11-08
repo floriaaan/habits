@@ -34,6 +34,8 @@ base64 = "=0.23.1"
 aes-gcm = { version = "=0.11.1", features = ["zeroize"] }
 zeroize = "=1.9.1"
 jsonwebtoken = { version = "=11.1.0", default-features = false, features = ["aws_lc_rs", "use_pem"] }
+argon2 = "=0.5.3"
+lettre = { version = "=0.11.23", default-features = false, features = ["builder", "smtp-transport", "tokio1-rustls-tls", "ring", "rustls-native-certs"] }
 
 [dev-dependencies]
 tempfile = "=3.27.0"

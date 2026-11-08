@@ -151,12 +151,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
         None
     };
     tracing::info!(address = %config.listen_addr, auth = ?config.auth_mode, "API listening");
-    axum::serve(
-        listener,
-        router_with_identity(store.clone(), config.auth_mode, runtime, oidc),
-    )
-    .with_graceful_shutdown(shutdown())
-    .await?;
+    let mut app = router_with_identity(store.clone(), config.auth_mode, runtime, oidc);
+    if config.auth_mode == AuthMode::Accounts {
+        let mail = habit_tracker::infrastructure::security::account_mail::AccountMail::from_env()?;
+        app = app.merge(habit_tracker::http::accounts::router(store.clone(), mail));
+    }
+    axum::serve(listener, app)
+        .with_graceful_shutdown(shutdown())
+        .await?;
     if let Some(worker) = worker {
         worker.abort();
         let _ = worker.await;

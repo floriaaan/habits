@@ -21,13 +21,14 @@ export function ProfileRow({
   last?: boolean
   feedback?: 'idle' | 'pending' | 'success' | 'error'
 }) {
-  const theme = useTheme(),
-    ink =
-      feedback === 'success'
-        ? theme.success
-        : feedback === 'error' || danger
-          ? theme.error
-          : theme.text
+  const theme = useTheme()
+  const ink = danger ? theme.error : theme.text
+  const feedbackInk =
+    feedback === 'success'
+      ? theme.success
+      : feedback === 'error'
+        ? theme.error
+        : ink
   return (
     <Pressable
       accessibilityRole="button"
@@ -44,12 +45,6 @@ export function ProfileRow({
         borderBottomWidth: last ? 0 : StyleSheet.hairlineWidth,
         borderBottomColor: theme.selected,
         opacity: disabled && feedback === 'idle' ? 0.45 : pressed ? 0.6 : 1,
-        backgroundColor:
-          feedback === 'success'
-            ? theme.successSurface
-            : feedback === 'error'
-              ? theme.errorSurface
-              : 'transparent',
       })}
     >
       <Icon name={icon} color={ink} size={23} />
@@ -67,7 +62,33 @@ export function ProfileRow({
           <Copy style={{ color: theme.secondary, fontSize: 14 }}>{value}</Copy>
         )}
       </View>
-      {feedback !== 'idle' && <ButtonFeedback phase={feedback} color={ink} />}
+      {feedback !== 'idle' && (
+        <View
+          style={{
+            width: 64,
+            alignItems: 'flex-end',
+            justifyContent: 'center',
+          }}
+        >
+          <View
+            style={{
+              minHeight: 36,
+              minWidth: feedback === 'pending' ? 64 : 36,
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: 10,
+              backgroundColor:
+                feedback === 'success'
+                  ? theme.successSurface
+                  : feedback === 'error'
+                    ? theme.errorSurface
+                    : 'transparent',
+            }}
+          >
+            <ButtonFeedback phase={feedback} color={feedbackInk} />
+          </View>
+        </View>
+      )}
       {!danger && feedback === 'idle' && (
         <Icon
           name={{ ios: 'chevron.right', android: 'chevron_right' }}

@@ -36,6 +36,25 @@ export function useActivityController(id: string) {
     }),
     !!item && !!session?.scopes.includes('entries:read'),
   )
+  const rests = useDomainQuery(
+    'habits',
+    [id, 'rests'],
+    (c, o) => allPages((page) => c.getRests(id, page, o), o),
+    !!item && !!session?.scopes.includes('habits:read'),
+  )
+  const resting = rests.data
+    ? rests.data.some((rest) => rest.local_date === item?.local_date)
+    : undefined
+  const versions = useDomainQuery(
+    'habits',
+    [id, 'versions'],
+    (c, o) => allPages((page) => c.getVersions(id, page, o), o),
+    !!item && !!session?.scopes.includes('habits:read'),
+  )
+  const plannedVersions =
+    versions.data
+      ?.filter((v) => v.effective_from > (item?.local_date ?? ''))
+      .sort((a, b) => a.effective_from.localeCompare(b.effective_from)) ?? []
   const mutation = useOperation(),
     keys = useRef(new Map<string, string>()),
     sending = useRef(false),
@@ -109,7 +128,9 @@ export function useActivityController(id: string) {
     setEditing(false)
   }
   return {
+    resting,
     finishAction,
+    plannedVersions,
     query,
     item,
     statistics,

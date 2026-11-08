@@ -4,7 +4,11 @@ export type TabPath =
   | '/today'
   | '/progress'
   | '/profile'
+  | '/login'
   | `/habit/${string}`
+  | `/edit/${string}`
+  | `/entry/${string}`
+  | `/rest/${string}`
 export interface CardTarget {
   targetOriginX: number
   targetOriginY: number

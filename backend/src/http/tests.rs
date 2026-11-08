@@ -398,7 +398,7 @@ fn openapi_documents_routes_security_and_request_schemas() {
             .values()
             .filter(|value| value.get("responses").is_some())
         {
-            if path.starts_with("/api/") {
+            if path.starts_with("/api/") && !path.starts_with("/api/v1/auth/") {
                 assert!(operation["security"][0]["bearer"].is_array(), "{path}");
             }
         }

@@ -109,7 +109,9 @@ export function Button({
       : shown === 'error'
         ? theme.errorSurface
         : variant === 'primary'
-          ? theme.text
+          ? tone === 'danger'
+            ? theme.error
+            : theme.text
           : variant === 'accent'
             ? theme.dark
               ? theme.accent

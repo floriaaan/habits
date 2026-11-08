@@ -9,6 +9,7 @@ import {
 } from 'react'
 import {
   Keyboard,
+  Platform,
   ScrollView,
   TextInput,
   type ScrollViewProps,
@@ -78,6 +79,10 @@ export const FormScrollView = forwardRef<NativeScroll, ScrollViewProps>(
             if (typeof ref === 'function') ref(node)
             else if (ref) ref.current = node
           }}
+          keyboardDismissMode={
+            props.keyboardDismissMode ??
+            (Platform.OS === 'ios' ? 'interactive' : 'on-drag')
+          }
           keyboardShouldPersistTaps={
             props.keyboardShouldPersistTaps ?? 'handled'
           }

@@ -13,3 +13,5 @@ pub fn opaque_token() -> Result<String, DomainError> {
 pub fn token_hash(token: &str) -> Vec<u8> {
     Sha256::digest(token.as_bytes()).to_vec()
 }
+
+pub mod account_mail;

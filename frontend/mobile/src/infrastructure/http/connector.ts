@@ -25,6 +25,7 @@ export class HttpHabitsConnector implements HabitsConnector {
         'personal_access_token',
         'service_account',
         'oidc_access_token',
+        'mobile_session',
       ].includes(value.mode) ||
       !Array.isArray(value.scopes) ||
       !value.scopes.every((scope) => scopes.includes(scope))

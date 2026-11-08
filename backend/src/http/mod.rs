@@ -1,3 +1,4 @@
+pub mod accounts;
 mod auth;
 mod dashboard;
 mod integrations;

@@ -1,3 +1,4 @@
+import { NativeDateField } from '../../shared/forms/NativeDateField'
 import { randomUUID } from 'expo-crypto'
 import { useEffect, useRef, useState } from 'react'
 import { Alert, Linking, Text, View } from 'react-native'
@@ -349,8 +350,18 @@ export function AuthenticatedTools() {
       </Section>
       <Section title="Habitudes et saisies">
         <View style={styles.row}>
-          <Field label="Limite" value={limit} onChange={setLimit} />
-          <Field label="Décalage" value={offset} onChange={setOffset} />
+          <Field
+            icon="quantity"
+            label="Limite"
+            value={limit}
+            onChange={setLimit}
+          />
+          <Field
+            icon="offset"
+            label="Décalage"
+            value={offset}
+            onChange={setOffset}
+          />
         </View>
         {!validPage && (
           <Text style={styles.error}>
@@ -405,6 +416,7 @@ export function AuthenticatedTools() {
           />
         </View>
         <Field
+          icon="id"
           label="ID de l’habitude"
           value={habitId}
           onChange={(v) => {
@@ -414,6 +426,7 @@ export function AuthenticatedTools() {
           }}
         />
         <Field
+          icon="quantity"
           label="Valeur de saisie / valeur dashboard"
           value={value}
           onChange={(v) => {
@@ -422,8 +435,10 @@ export function AuthenticatedTools() {
             setOccurredAt('')
           }}
         />
-        <Field
-          label="Instant RFC3339 (vide = maintenant au premier envoi)"
+        <NativeDateField
+          instant
+          label="Date et heure de la saisie (UTC)"
+          hint="Sans modification : instant du premier envoi."
           value={occurredAt}
           onChange={(v) => {
             setOccurredAt(v)
@@ -488,8 +503,18 @@ export function AuthenticatedTools() {
               ),
             )}
           </View>
-          <Field label="Objectif" value={target} onChange={setTarget} />
-          <Field label="Fuseau IANA" value={timezone} onChange={setTimezone} />
+          <Field
+            icon="target"
+            label="Objectif"
+            value={target}
+            onChange={setTarget}
+          />
+          <Field
+            icon="globe"
+            label="Fuseau IANA"
+            value={timezone}
+            onChange={setTimezone}
+          />
           <Button
             label="Créer l’habitude"
             disabled={blocked || !name.trim()}
@@ -534,6 +559,7 @@ export function AuthenticatedTools() {
         <Text style={styles.heading}>{operation.label}</Text>
         {operation.fields?.includes('id') && (
           <Field
+            icon="id"
             label="ID de la ressource"
             value={fields.id}
             onChange={(id) => {
@@ -543,8 +569,8 @@ export function AuthenticatedTools() {
           />
         )}
         {operation.fields?.includes('date') && (
-          <Field
-            label="Date YYYY-MM-DD"
+          <NativeDateField
+            label="Date"
             value={fields.date}
             onChange={(date) => {
               setFields((f) => ({ ...f, date }))
@@ -555,11 +581,13 @@ export function AuthenticatedTools() {
         {operation.read && (
           <View style={styles.row}>
             <Field
+              icon="quantity"
               label="Limite avancée"
               value={fields.limit}
               onChange={(limit) => setFields((f) => ({ ...f, limit }))}
             />
             <Field
+              icon="offset"
               label="Décalage avancé"
               value={fields.offset}
               onChange={(offset) => setFields((f) => ({ ...f, offset }))}

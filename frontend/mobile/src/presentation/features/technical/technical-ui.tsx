@@ -1,3 +1,4 @@
+import { FormLabel, type FormIcon } from '../../shared/forms/FormLabel'
 import { type ReactNode } from 'react'
 import { Pressable, Text, View } from 'react-native'
 import { FormInput } from '../../shared/forms/FormScrollView'
@@ -33,16 +34,22 @@ export function Field({
   onChange,
   multiline = false,
   secret = false,
+  icon,
 }: {
   label: string
   value: string
   onChange: (value: string) => void
   multiline?: boolean
   secret?: boolean
+  icon?: FormIcon
 }) {
   return (
     <View style={styles.field}>
-      <Text style={styles.label}>{label}</Text>
+      <FormLabel
+        label={label}
+        icon={icon ?? (secret ? 'key' : multiline ? 'editor' : 'text')}
+        style={styles.label}
+      />
       <FormInput
         accessibilityLabel={label}
         value={value}

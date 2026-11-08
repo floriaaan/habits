@@ -258,9 +258,13 @@ async fn bearer_identity(
     oidc: Option<&std::sync::Arc<crate::infrastructure::security::oidc::OidcVerifier>>,
     token: &str,
 ) -> Result<crate::modules::auth::Principal, DomainError> {
+    if mode != crate::config::AuthMode::Disabled && token.starts_with("hs_") {
+        return store.authenticate_mobile(token).await;
+    }
     match mode {
         crate::config::AuthMode::Disabled => Err(DomainError::Unauthenticated),
         crate::config::AuthMode::Tokens => store.authenticate_local_token(token).await,
+        crate::config::AuthMode::Accounts => store.authenticate_token(token).await,
         crate::config::AuthMode::Oidc => {
             if token.starts_with("ht_") {
                 store.authenticate_token(token).await

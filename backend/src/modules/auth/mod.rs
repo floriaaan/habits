@@ -1,3 +1,4 @@
+pub mod accounts;
 use crate::modules::{DomainError, users::UserId};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -7,6 +8,7 @@ use uuid::Uuid;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum IdentityMode {
     OidcAccessToken,
+    MobileSession,
     PersonalAccessToken,
     ServiceAccount,
 }

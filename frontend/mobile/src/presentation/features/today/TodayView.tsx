@@ -26,6 +26,7 @@ import {
   useTheme,
 } from '../../shared/ui/native-ui'
 import { DaySelector } from './DaySelector'
+import { RestingHabitsCard } from './RestingHabitsCard'
 import { JournalCard } from './JournalCard'
 import { PendingHabitsCard } from './PendingHabitsCard'
 import { dateLabel } from './today-visuals'
@@ -135,7 +136,7 @@ export function TodayView({ model }: { model: TodayController }) {
             )}
             {historical && selected && (
               <Copy style={{ fontSize: 13, color: theme.secondary }}>
-                Historique des habitudes actives · Lecture seule
+                Historique des habitudes actives
               </Copy>
             )}
           </MotionCard>
@@ -188,7 +189,8 @@ export function TodayView({ model }: { model: TodayController }) {
               </View>
             ) : (
               <>
-                <JournalCard {...{ day, compact }} />
+                <JournalCard {...{ day, compact, canWrite }} />
+                <RestingHabitsCard model={model} />
                 <PendingHabitsCard
                   {...{
                     day,
@@ -206,6 +208,9 @@ export function TodayView({ model }: { model: TodayController }) {
                     canWrite,
                     compact,
                   }}
+                  canManageRest={model.canManageRest}
+                  openHabitMenu={model.openHabitMenu}
+                  restRemoving={model.restRemoving}
                 />
               </>
             )}

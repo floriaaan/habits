@@ -73,7 +73,10 @@ export function useSessionController(runtime: Runtime) {
       runtime.vault.onInvalid = () => {}
     }
   }, [runtime])
-  async function signIn(pat?: string) {
+  async function signIn(
+    pat?: string,
+    account?: { email: string; password: string },
+  ) {
     const request = ++epoch.current
     setError('')
     setStatus('restoring')
@@ -88,8 +91,9 @@ export function useSessionController(runtime: Runtime) {
         }
         return request === epoch.current
       }
-      const credentials: Credentials | null =
-        pat === undefined
+      const credentials: Credentials | null = account
+        ? await runtime.accounts.login(account.email, account.password)
+        : pat === undefined
           ? await runtime.oidc.signIn()
           : {
               origin: runtime.config.origin,
@@ -121,6 +125,11 @@ export function useSessionController(runtime: Runtime) {
     }
   }
   async function signOut() {
+    const credentials = runtime.vault.current?.()
+    if (credentials?.kind === 'account') {
+      // Keep the session available for retry if server-side revocation fails.
+      await runtime.accounts.logout(credentials)
+    }
     epoch.current++
     setSession(null)
     setStatus('signedOut')

@@ -27,6 +27,7 @@ pub enum AuthMode {
     Disabled,
     Tokens,
     Oidc,
+    Accounts,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -54,9 +55,10 @@ impl Config {
             "disabled" => AuthMode::Disabled,
             "tokens" | "local" => AuthMode::Tokens,
             "oidc" => AuthMode::Oidc,
+            "accounts" => AuthMode::Accounts,
             _ => {
                 return Err(ConfigError(
-                    "AUTH_MODE must be disabled, local (tokens alias) or oidc",
+                    "AUTH_MODE must be disabled, local (tokens alias), accounts or oidc",
                 ));
             }
         };

@@ -61,7 +61,12 @@ export default function RootLayout() {
                 >
                   <Stack.Screen
                     name="login"
-                    options={{ headerShown: true, title: 'Connexion' }}
+                    options={{
+                      headerShown: false,
+                      title: 'Connexion',
+                      animation: 'none',
+                      gestureEnabled: false,
+                    }}
                   />
                   <Stack.Screen
                     name="console"
@@ -74,6 +79,30 @@ export default function RootLayout() {
                       presentation: 'card',
                       animation: 'none',
                       title: 'Habitude',
+                    }}
+                  />
+                  <Stack.Screen
+                    name="edit/[id]"
+                    options={{
+                      headerShown: false,
+                      animation: 'none',
+                      gestureEnabled: false,
+                    }}
+                  />
+                  <Stack.Screen
+                    name="entry/[id]"
+                    options={{
+                      headerShown: false,
+                      animation: 'none',
+                      gestureEnabled: false,
+                    }}
+                  />
+                  <Stack.Screen
+                    name="rest/[id]"
+                    options={{
+                      headerShown: false,
+                      animation: 'none',
+                      gestureEnabled: false,
                     }}
                   />
                   <Stack.Screen

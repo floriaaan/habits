@@ -81,7 +81,7 @@ interface MotionContext {
     layoutHeight: number,
   ) => void
   scroll: (screen: TabPath, y: number) => void
-  prepare: (destination: TabPath, source: string) => void
+  prepare: (destination: TabPath, source: string, resize?: boolean) => void
 }
 const Context = createContext<MotionContext | null>(null)
 
@@ -190,8 +190,8 @@ export function TabCardMotionProvider({ children }: { children: ReactNode }) {
     }
     return result
   }
-  function prepare(destination: TabPath, source: string) {
-    if (destination === source) return
+  function prepare(destination: TabPath, source: string, resize = false) {
+    if (destination === source && !resize) return
     const id = ++sequence.current
     busy.current = false
     if (reduced.current) {
@@ -332,6 +332,11 @@ export function usePrepareNativeTabMotion() {
   const motion = useContext(Context)
   return (destination: TabPath, source: string) =>
     motion?.prepare(destination, source)
+}
+// Local form steps share a route but can change the visible card dimensions.
+export function usePrepareCardResize(screen: TabPath) {
+  const motion = useContext(Context)
+  return () => motion?.prepare(screen, screen, true)
 }
 export function useTabMotionScroll(screen: TabPath) {
   const motion = useContext(Context)

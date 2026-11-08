@@ -4,6 +4,7 @@ import type {
   Entry,
   HabitStatistics,
   HabitVersion,
+  RestException,
 } from '../domain/models'
 import { allPages } from './pagination'
 
@@ -12,6 +13,7 @@ export interface JournalHistory {
   entries: Entry[]
   statistics: HabitStatistics
   versions: HabitVersion[]
+  rests: RestException[]
 }
 export async function loadJournal(
   connector: HabitsConnector,
@@ -27,7 +29,7 @@ export async function loadJournal(
       ...(await Promise.all(
         items.slice(offset, offset + 8).map(async (item) => {
           const id = item.habit.id
-          const [entries, statistics, versions] = await Promise.all([
+          const [entries, statistics, versions, rests] = await Promise.all([
             allPages(
               async (page) =>
                 (await connector.listEntries(id, page, options)).items,
@@ -38,8 +40,9 @@ export async function loadJournal(
               (page) => connector.getVersions(id, page, options),
               options,
             ),
+            allPages((page) => connector.getRests(id, page, options), options),
           ])
-          return { item, entries, statistics, versions }
+          return { item, entries, statistics, versions, rests }
         }),
       )),
     )

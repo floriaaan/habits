@@ -1,14 +1,20 @@
-import { View } from 'react-native'
+import { router } from 'expo-router'
+import { usePrepareNativeTabMotion } from '../../shared/motion/TabCardMotion'
+import { Pressable, View } from 'react-native'
 import { amount } from '../../shared/models/home-model'
 import { MotionCard } from '../../shared/motion/TabCardMotion'
-import { Copy, useTheme } from '../../shared/ui/native-ui'
+import { Copy, Icon, useTheme } from '../../shared/ui/native-ui'
 import { colors, HabitIcon } from './today-visuals'
 import { s } from './today.styles'
 import type { TodayController } from './useTodayController'
 
-type Props = Pick<TodayController, 'day'> & { compact: boolean }
-export function JournalCard({ day, compact }: Props) {
+type Props = Pick<TodayController, 'day'> & {
+  compact: boolean
+  canWrite: boolean
+}
+export function JournalCard({ day, compact, canWrite }: Props) {
   const theme = useTheme()
+  const prepare = usePrepareNativeTabMotion()
   if (!day) return null
   return (
     <MotionCard
@@ -28,8 +34,21 @@ export function JournalCard({ day, compact }: Props) {
         </Copy>
       )}
       {day.events.map(({ entry, item }, index) => (
-        <View
+        <Pressable
           key={entry.id}
+          accessibilityRole={canWrite ? 'button' : undefined}
+          accessibilityLabel={`${item.habit.name}, ${amount(entry.value, item.habit.unit)}, ${new Date(entry.occurred_at).toLocaleString('fr-FR', { timeZone: item.habit.timezone })}`}
+          accessibilityHint={
+            canWrite ? 'Corriger ou supprimer cette saisie' : undefined
+          }
+          disabled={!canWrite}
+          onPress={() => {
+            prepare(`/entry/${entry.id}`, '/today')
+            router.push({
+              pathname: '/entry/[id]',
+              params: { id: entry.id, from: 'today' },
+            })
+          }}
           style={[
             s.event,
             compact && {
@@ -87,8 +106,17 @@ export function JournalCard({ day, compact }: Props) {
                   : ''}
               </Copy>
             </View>
+            {canWrite && (
+              <View style={{ paddingTop: 4 }}>
+                <Icon
+                  name={{ ios: 'chevron.right', android: 'chevron_right' }}
+                  size={16}
+                  color={theme.secondary}
+                />
+              </View>
+            )}
           </View>
-        </View>
+        </Pressable>
       ))}
       {day.events.length > 0 && (
         <Copy style={{ color: theme.secondary, fontSize: 12 }}>

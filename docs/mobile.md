@@ -182,3 +182,181 @@ La carte rose de l’accueil ouvre `/progress?section=overview`. La carte verte 
 L’accueil et Progression partagent `chart-model.ts` : interpolation cubique monotone bornée, sans dépassement des valeurs ni trait entre des dates manquantes. Le connector fake produit trente jours de saisies UTC plausibles, avec des quantités arrondies au pas des objectifs et des versions d’habitudes remontant à 29 jours. Ses séries hebdomadaires conservent sept jours courants et sept jours précédents, avec des moyennes calculées depuis les valeurs réelles. Courbes, totaux, XP et séries dérivent des saisies simulées ; aucune donnée HTTP n’est remplacée.
 
 Les images A/B/C, leurs prompts et la comparaison restent archivés dans `frontend/mobile/.impeccable/mocks/progression-v1/`. Elles documentent le choix B + cartes de A ; elles ne sont pas embarquées dans l’interface. Aucun rendu natif n’a été vérifié sur appareil pour cette refonte.
+
+
+## Connexion B — comptes e-mail
+
+Le login utilise une card principale et une card d’actions verte, sans header natif.
+Les modes connexion, inscription, récupération et nouveau mot de passe
+partagent les composants de formulaire adaptés au clavier et les retours animés des
+boutons. Le serveur est préconfiguré ; PAT et fournisseur OIDC restent dans « Autres
+moyens de connexion ». Apple et Google sont désactivés avec la mention « Bientôt ».
+L’envoi SMTP et le mode serveur sont décrits dans [auth.md](auth.md#comptes-grand-public-pour-le-mobile).
+Le mode démo continue d’ouvrir l’application directement, sans faux compte serveur.
+Aucun simulateur n’a été utilisé ; le rendu natif et l’envoi sur un relais réel restent
+à vérifier sur appareil et avec la configuration de déploiement.
+
+Le clavier peut être fermé par le bouton « Terminé » au-dessus du clavier et par
+glissement du formulaire. L’inscription ne demande plus de vérification d’e-mail ;
+le code par e-mail reste uniquement dans la récupération du mot de passe.
+
+Les cards de bienvenue et connexion participent au morphing partagé. La route login
+n’utilise aucune translation native ni geste de retour latéral ; le retour explicite
+prépare le morph inverse. Les changements locaux de formulaire peuvent préparer un
+redimensionnement sur la même route. À la connexion réussie, le morph vers l’accueil
+est préparé après le feedback du bouton. Seules les surfaces visibles et de même
+palette sont associées, avec le réglage système de réduction des animations.
+
+
+## Création d’habitude — A puis C
+
+Le parcours comprend trois étapes (définition, objectif, rythme), puis un récapitulatif
+modifiable avant l’envoi atomique à `/habits/setup`. Les valeurs restent conservées
+quand une ligne du récapitulatif ramène à une étape. Aucune création n’est envoyée
+avant la confirmation finale. Le bouton utilise le retour de chargement/succès/échec
+partagé et conserve la clé d’idempotence sur un nouvel essai identique.
+
+Les réglages couvrent nom (120 caractères), catégorie, type, unité, cible, période
+jour/semaine, jours ISO, plage horaire, fuseau IANA, icône MDI, couleur hexadécimale,
+illustration compatible, pas d’ajout, poids dans la progression et ordre d’affichage.
+La personnalisation et les options avancées restent repliées. Les valeurs de km, L
+et minutes sont converties vers mètres, millilitres et secondes avant l’envoi.
+
+Le rappel Home Assistant est désactivé tant que la liste des intégrations ne confirme
+pas une connexion active. Chargement, échec, absence de connexion ou de permission
+`integrations:manage` ne rendent jamais le switch disponible. Aucune connexion n’est
+simulée pour débloquer la démo. Une erreur est réessayable ; un message indique où
+configurer l’intégration depuis le profil. Si une connexion disparaît après activation,
+le rappel doit être retiré ou la connexion restaurée avant validation. À la soumission,
+la connexion est relue pour empêcher une création basée sur un état périmé. Il s’agit
+d’un rappel via Home Assistant, pas d’une notification mobile.
+
+Le formulaire réutilise le défilement adapté au clavier et le bouton Terminé ; les
+transitions d’étape respectent la réduction des animations. Pas de nouvelle dépendance.
+Les tests vérifient la conversion, les réglages rejetés par le backend, l’idempotence
+et le blocage du rappel. Aucun rendu natif ni simulateur n’a été utilisé pour ce lot.
+
+
+### Création simplifiée
+
+Le sélecteur de jours utilise sept pastilles circulaires (L M M J V S D) sur une
+seule ligne, teintées selon la catégorie. Chaque jour conserve une cible tactile
+d’au moins 44 points et un libellé accessible complet ; les écrans étroits peuvent
+faire défiler la ligne. La personnalisation n’est plus présentée dans le formulaire
+ni le récapitulatif : icône/couleur automatiques, illustration choisie selon l’unité.
+Les options avancées restent repliées. Le blocage du rappel Home Assistant est conservé.
+
+Le formulaire de création ne propose plus d’options avancées : seul le pas d’ajout reste visible pour quantité/durée, avec sa ligne dans le récapitulatif. Poids et ordre gardent leurs valeurs par défaut ; le fuseau est celui de l’appareil.
+
+## Modifier et archiver une habitude — A et C
+
+Le bouton Modifier de la fiche ouvre `/edit/[id]` sans translation native, avec le
+morphing partagé des cards ; le retour utilise le morph inverse. Le formulaire A
+réutilise les champs et les sept pastilles de création. Il permet nom, catégorie,
+objectif et planning, avec la date d’application directement dans le formulaire.
+Aucun écran B supplémentaire. Le type, l’unité, la période et le fuseau sont conservés.
+La date est future dans les 366 jours, et un lundi pour une habitude hebdomadaire.
+Les dates déjà programmées sont signalées ; la date initiale évite leurs conflits.
+La fiche indique la prochaine modification après l’enregistrement.
+
+Le rappel est modifiable seulement si la présentation est lisible et Home Assistant
+connecté ; sa connexion est revérifiée avant activation. Un rappel existant peut
+être conservé ou retiré quand la connexion est indisponible. Contrairement à la
+définition future, son changement de présentation est immédiat et annoncé comme tel.
+Les autres réglages de présentation sont relus et préservés. Les deux endpoints
+ne sont pas atomiques : si la définition est programmée mais que le rappel échoue,
+l’écran l’indique et reste ouvert. Un nouvel essai reconnaît une version identique
+déjà persistée (réponse perdue ou premier enregistrement partiel), sans écraser une
+version différente à la même date. Les requêtes métier sont invalidées même après
+un résultat partiel.
+
+Archiver ouvre la confirmation C, avec coins de 18 points, un contenu défilable
+pour les petits écrans et le texte agrandi, une action destructive et une annulation.
+Aucune restauration n’est promise. L’archivage conserve les saisies et ramène à
+l’accueil après le retour de succès. Le bouton et la fermeture sont protégés pendant
+la requête et après sa réussite. Les erreurs gardent la confirmation réessayable.
+Quitter un formulaire modifié demande de confirmer l’abandon des changements locaux.
+
+Les tests couvrent les dates/fuseaux, les propriétés immuables, les rappels immédiats,
+la reprise d’une réponse perdue, les conflits et l’archivage sans perte de saisies.
+Aucun changement du contrat Rust et aucune nouvelle dépendance. Le rendu natif,
+les gestes et le clavier restent à vérifier sur appareil ; aucun simulateur utilisé.
+
+Les horaires existants gardent leurs secondes/fractions lors d’une modification
+sans changement du champ horaire. Le retour système Android passe par la même
+confirmation d’abandon et reste bloqué pendant l’écriture et le retour de succès.
+Une définition devenue différente depuis l’ouverture demande de rouvrir l’éditeur
+pour éviter d’écraser des réglages apparus entre-temps.
+
+### Corriger ou supprimer une saisie
+
+Les cinq dernières saisies de la fiche d’habitude ouvrent `/entry/[id]` si
+l’utilisateur dispose de `entries:write`. Le formulaire permet de corriger la
+valeur (quantité/durée), la date et l’heure dans le fuseau de l’habitude. Les
+validations et répétitions conservent une valeur de 1. Une date/heure inchangée
+conserve la précision exacte de l’instant d’origine. Les heures inexistantes ou
+ambiguës lors du changement d’heure sont refusées explicitement. Le backend
+reste l’autorité pour les règles historiques, jours de pratique et repos.
+
+L’enregistrement utilise `correctEntry`, la suppression confirmée utilise
+`cancelEntry`. Une nouvelle tentative consécutive de la même intention conserve sa clé
+d’idempotence après erreur. Changer d’intention renouvelle la clé, même en
+revenant ensuite à une valeur déjà soumise. Historique,
+dashboard, habitudes, statistiques et gamification sont invalidés après succès.
+Le bouton reste verrouillé pendant le feedback de succès avant le retour à la
+fiche. Une fermeture avec des modifications non enregistrées demande de les
+abandonner ; le geste retour natif est désactivé et le bouton retour Android
+suit le même parcours.
+
+Le journal d’« Aujourd’hui » permet également d’ouvrir une saisie pour la
+corriger ou la supprimer, y compris dans l’historique, avec `entries:write`.
+Le retour conserve l’écran d’origine et la journée sélectionnée. Les actions
+rapides d’une journée passée restent désactivées. Les libellés des formulaires
+utilisent le composant partagé `FormLabel` avec une icône sémantique décorative,
+sans modifier les inputs, leurs références ni la gestion du clavier.
+
+### Jours de repos ponctuels
+
+Depuis « Aujourd’hui », le menu `…` d’une habitude dans le bilan propose
+« Repos ce jour ». La fiche d’habitude propose aussi « Prévoir un repos ».
+Ces accès ouvrent `/rest/[id]`, avec la date du jour consulté dans le premier
+cas et la date locale de l’habitude dans le second. Le formulaire affiche son
+fuseau, une date AAAA-MM-JJ et une semaine de dates sélectionnables. Les
+jours récurrents de pratique restent dans la modification de l’habitude.
+
+Le repos est une exception pour une seule habitude et une seule date. Il
+utilise `setRest` ; son retrait utilise `removeRest`, opérations existantes
+équivalentes en cas de nouvelle tentative. Le serveur conserve les saisies,
+recalcule statistiques et XP, neutralise le jour pour les séries et ne réduit
+pas l’objectif hebdomadaire. La section bleue « En repos » d’« Aujourd’hui »
+montre uniquement les exceptions explicites du jour sélectionné, sans carte
+vide ni assimilation aux jours normalement non prévus. Elle propose « Retirer ».
+Le journal conserve les saisies existantes de ces journées.
+
+La gestion des repos exige `habits:write`, distinct de `entries:write`. La
+lecture des exceptions nécessite `habits:read` et parcourt toutes les pages.
+Après une écriture, les caches habitudes, dashboard, journal, statistiques et
+gamification sont invalidés. Le retour conserve l’écran d’origine ; les
+boutons et la navigation sont verrouillés pendant l’écriture et le feedback
+de succès. Aucune nouvelle route backend ni dépendance native n’est ajoutée.
+Le rendu, le clavier et les interactions restent à valider sur appareil.
+
+### Sélection native des dates
+
+Tous les champs de date produit (repos, date d’effet d’une modification,
+correction d’une saisie) et les champs dédiés des outils avancés utilisent
+`NativeDateField`, basé sur `@react-native-community/datetimepicker` installé
+avec Expo. iOS affiche le contrôle compact système ; Android ouvre son
+calendrier système. Le champ d’instant des outils avancés utilise également
+les sélecteurs natifs de date et d’heure. Les corps JSON avancés restent JSON.
+Une reconstruction du development build est nécessaire après l’ajout du module.
+
+Le domaine conserve ses dates ISO, mais aucun utilisateur ne doit en saisir
+le format. Les jours calendaires sont échangés avec le picker en UTC pour
+éviter un changement de date selon le fuseau du téléphone ; les dates
+métier restent celles de l’habitude. Les dates d’effet sont bornées aux
+366 prochains jours ; une entrée ne peut être datée d’un jour futur dans
+son fuseau. Les règles historiques et le choix d’un lundi restent validés
+par le modèle et le serveur. Les en-têtes des sélecteurs de semaine montrent
+la plage réellement consultée ; « Aujourd’hui » est un retour à la semaine
+courante, affiché uniquement lorsqu’on s’en est éloigné.

@@ -38,12 +38,12 @@ export function ProfileView({ model }: { model: ProfileController }) {
     allowed,
     progress,
     working,
+    activeAction,
     feedback,
     chooseAppearance,
     connection,
     resetDemo,
-    perform,
-    signOut,
+    logout,
   } = model
   const theme = useTheme(),
     insets = useDeviceInsets(),
@@ -243,21 +243,39 @@ export function ProfileView({ model }: { model: ProfileController }) {
               disabled={working}
               onPress={() => router.push('/console')}
             />
+            {isDemo && (
+              <ProfileRow
+                icon={{ ios: 'arrow.counterclockwise', android: 'restart_alt' }}
+                label="Réinitialiser la démo"
+                feedback={
+                  activeAction === 'reset'
+                    ? working
+                      ? 'pending'
+                      : feedback
+                    : 'idle'
+                }
+                danger
+                disabled={working}
+                onPress={resetDemo}
+              />
+            )}
             <ProfileRow
-              icon={
-                isDemo
-                  ? { ios: 'arrow.counterclockwise', android: 'restart_alt' }
-                  : {
-                      ios: 'rectangle.portrait.and.arrow.right',
-                      android: 'logout',
-                    }
+              icon={{
+                ios: 'rectangle.portrait.and.arrow.right',
+                android: 'logout',
+              }}
+              label="Se déconnecter"
+              feedback={
+                activeAction === 'logout'
+                  ? working
+                    ? 'pending'
+                    : feedback
+                  : 'idle'
               }
-              label={isDemo ? 'Réinitialiser la démo' : 'Se déconnecter'}
-              feedback={working ? 'pending' : feedback}
               danger
               last
               disabled={working}
-              onPress={() => (isDemo ? resetDemo() : void perform(signOut))}
+              onPress={logout}
             />
           </MotionCard>
         </ScrollView>

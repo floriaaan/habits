@@ -25,16 +25,26 @@ export function useProfileController() {
   const progress = useDashboardQuery(allowed)
   const [working, setWorking] = useState(false),
     locked = useRef(false)
+  const [activeAction, setActiveAction] = useState<'reset' | 'logout' | null>(
+    null,
+  )
   const [feedback, setFeedback] = useState<'idle' | 'success' | 'error'>('idle')
   useEffect(() => {
     if (feedback === 'idle') return
-    const timer = setTimeout(() => setFeedback('idle'), 850)
+    const timer = setTimeout(() => {
+      setFeedback('idle')
+      setActiveAction(null)
+    }, 850)
     return () => clearTimeout(timer)
   }, [feedback])
-  async function perform(action: () => Promise<unknown>) {
+  async function perform(
+    action: () => Promise<unknown>,
+    kind: 'reset' | 'logout',
+  ) {
     if (locked.current) return
     locked.current = true
     setWorking(true)
+    setActiveAction(kind)
     setFeedback('idle')
     try {
       await action()
@@ -67,11 +77,13 @@ export function useProfileController() {
   }
   function connection() {
     const mode =
-      session!.mode === 'oidc_access_token'
-        ? 'Connexion via votre fournisseur d’identité'
-        : session!.mode === 'service_account'
-          ? 'Compte de service'
-          : 'Jeton d’accès personnel'
+      session!.mode === 'mobile_session'
+        ? 'Connexion par e-mail'
+        : session!.mode === 'oidc_access_token'
+          ? 'Connexion via votre fournisseur d’identité'
+          : session!.mode === 'service_account'
+            ? 'Compte de service'
+            : 'Jeton d’accès personnel'
     Alert.alert(
       'Connexion',
       runtime.fake
@@ -98,7 +110,7 @@ export function useProfileController() {
                 'statistics',
                 'gamification',
               ])
-            })
+            }, 'reset')
           },
         },
       ],
@@ -116,12 +128,14 @@ export function useProfileController() {
     allowed,
     progress,
     working,
+    activeAction,
     feedback,
     chooseAppearance,
     connection,
     resetDemo,
-    perform,
-    signOut,
+    logout: () => {
+      void perform(signOut, 'logout')
+    },
   }
 }
 export type ProfileController = ReturnType<typeof useProfileController>

@@ -153,5 +153,60 @@ connecteurs et leurs limites sont décrits dans [integrations.md](integrations.m
 
 `GET /api/v1/session` utilise le middleware existant et ne nécessite aucun scope
 métier. Il renvoie `user_id`, `mode` (`personal_access_token`, `service_account` ou
-`oidc_access_token`) et les `scopes` effectifs, sans secret, avec `Cache-Control: no-store`.
+`oidc_access_token` ou `mobile_session`) et les `scopes` effectifs, sans secret, avec `Cache-Control: no-store`.
 Un credential invalide, expiré/révoqué ou le mode disabled produit 401.
+
+
+## Comptes grand public pour le mobile
+
+Activer `AUTH_MODE=accounts`. L’inscription e-mail/mot de passe permet une connexion
+immédiate, sans vérification d’adresse ni envoi d’e-mail. Les anciens comptes en attente
+de vérification deviennent également utilisables avec leur mot de passe existant.
+Une nouvelle inscription ne peut jamais remplacer le mot de passe d’une adresse déjà
+inscrite. Chaque compte a son propre tenant non administrateur ; aucune liaison ou
+migration implicite vers les tenants local/OIDC n’est effectuée.
+
+Le mot de passe comporte au moins 12 caractères et au plus 1024 octets, hachés avec
+Argon2id et un sel aléatoire. Deux calculs au plus s’exécutent simultanément hors de
+l’exécuteur HTTP. L’adresse est normalisée en minuscules, mais n’est pas une preuve
+de possession. L’application utilise `EXPO_PUBLIC_API_URL`, sans serveur à saisir.
+
+SMTP est facultatif pour démarrer et s’inscrire. Pour récupérer un mot de passe,
+configurer `SMTP_HOST`, `SMTP_PORT` (587 par défaut), `SMTP_USERNAME`, `SMTP_PASSWORD`
+et `SMTP_FROM`. STARTTLS et certificat valide sont requis. Sans SMTP, la demande de
+récupération répond 503 ; elle ne prétend pas avoir envoyé un e-mail.
+Le Compose racine transmet ces variables. Exposer l’API derrière HTTPS.
+
+| Route publique, POST | Corps JSON | Résultat |
+| --- | --- | --- |
+| `/api/v1/auth/register` | `email`, `password`, `timezone` | 204 ; compte créé, connexion immédiate possible |
+| `/api/v1/auth/login` | `email`, `password` | paire de tokens |
+| `/api/v1/auth/forgot-password` | `email` | 204 ; code si compte existant et SMTP configuré |
+| `/api/v1/auth/reset-password` | `email`, `code`, `password` | 204 ; toutes les sessions révoquées |
+| `/api/v1/auth/refresh` | `refresh_token` | paire renouvelée |
+| `/api/v1/auth/logout` | `refresh_token` | 204 ; session révoquée |
+
+Les anciennes routes `/auth/verify` et `/auth/resend` sont retirées. La colonne historique
+`verified_at` est conservée pour compatibilité de schéma et n’intervient plus dans
+l’authentification. Les codes de récupération restent à huit chiffres, valables
+15 minutes, limités à cinq essais, à usage unique. Les réponses de récupération
+n’indiquent pas si le compte existe. Limites par fenêtre de 15 minutes : cinq
+inscriptions/demandes d’e-mail par adresse, dix connexions, quinze validations de code,
+300 opérations au total pour l’instance. Répartir le budget global par client si le
+trafic devient important.
+
+Les paires contiennent `access_token` (`hs_…`), `refresh_token` (`hr_…`) et `expires_in`
+(900 secondes). Chaque secret contient 256 bits aléatoires ; seules ses empreintes
+sont stockées. Durée absolue d’une session : 30 jours. Le renouvellement remplace
+atomiquement les deux tokens ; un rejeu révoque la famille. Une déconnexion révoque
+la session même si son refresh vient d’être renouvelé. La désactivation du compte
+est vérifiée à chaque accès/renouvellement. Le mobile conserve la paire dans
+SecureStore, mutualise les renouvellements et purge le cache sur changement de compte.
+La déconnexion reste réessayable si la révocation serveur échoue.
+
+Les réponses d’authentification sont `no-store`. Codes, mots de passe, tokens et
+contenu des e-mails ne sont pas journalisés. L’envoi SMTP est direct avec timeout,
+sans file supplémentaire ; son fonctionnement réel reste à vérifier au déploiement.
+Apple et Google restent désactivés (« Bientôt »), avec leurs icônes. Le mode accounts
+accepte les PAT existants et les sessions mobiles ; le SSO reste propre aux
+déploiements `AUTH_MODE=oidc`.

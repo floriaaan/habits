@@ -13,6 +13,7 @@ use std::{path::Path, str::FromStr, time::Duration};
 use uuid::Uuid;
 
 pub static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("./migrations");
+pub mod accounts;
 mod auth;
 mod dashboard;
 #[cfg(test)]

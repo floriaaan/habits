@@ -1,3 +1,4 @@
+import { weekLabel } from '../../shared/forms/date-field-model'
 import { Pressable, ScrollView, View } from 'react-native'
 import { shiftDay } from '../../../domain/calendar'
 import { Copy, Icon, useTheme } from '../../shared/ui/native-ui'
@@ -38,19 +39,30 @@ export function DaySelector({
                 size={17}
               />
             </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Revenir à aujourd’hui"
-              onPress={() => {
-                setWeek(null)
-                choose(today)
-              }}
-              style={s.returnToday}
-            >
-              <Copy style={{ color: theme.secondary, fontSize: 14 }}>
-                Aujourd’hui
+            <View style={{ flex: 1, alignItems: 'center' }}>
+              <Copy
+                style={{
+                  color: theme.secondary,
+                  fontSize: 13,
+                  textAlign: 'center',
+                }}
+              >
+                {weekLabel(anchor)}
               </Copy>
-            </Pressable>
+              {weekDays(anchor)[0] !== weekDays(today)[0] && (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Revenir à aujourd’hui"
+                  onPress={() => {
+                    setWeek(null)
+                    choose(today)
+                  }}
+                  style={s.returnToday}
+                >
+                  <Copy style={{ fontSize: 13 }}>Aujourd’hui</Copy>
+                </Pressable>
+              )}
+            </View>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Semaine suivante"

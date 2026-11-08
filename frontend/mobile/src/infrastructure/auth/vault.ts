@@ -48,7 +48,7 @@ export class CredentialVault implements AccessSource {
       typeof value.accessToken !== 'string' ||
       value.origin !== this.origin ||
       !value.accessToken ||
-      !['pat', 'oidc'].includes(value.kind ?? '') ||
+      !['pat', 'oidc', 'account'].includes(value.kind ?? '') ||
       (value.refreshToken !== undefined &&
         typeof value.refreshToken !== 'string') ||
       (value.expiresAt !== undefined && !Number.isFinite(value.expiresAt))
@@ -91,11 +91,18 @@ export class CredentialVault implements AccessSource {
     this.onInvalid()
     await this.save(null)
   }
+  current() {
+    return this.credentials ? { ...this.credentials } : null
+  }
   peekToken() {
     return this.credentials?.accessToken ?? null
   }
   canRefresh() {
-    return this.credentials?.kind === 'oidc' && !!this.credentials.refreshToken
+    return (
+      (this.credentials?.kind === 'oidc' ||
+        this.credentials?.kind === 'account') &&
+      !!this.credentials.refreshToken
+    )
   }
   async getToken(forceRefresh = false): Promise<string | null> {
     const credentials = this.credentials

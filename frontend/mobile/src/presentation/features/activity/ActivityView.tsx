@@ -1,8 +1,9 @@
 import {
   MotionCard,
   useTabMotionScroll,
+  usePrepareNativeTabMotion,
 } from '../../shared/motion/TabCardMotion'
-import { Stack } from 'expo-router'
+import { Stack, router } from 'expo-router'
 import { useState } from 'react'
 import { Pressable, ScrollView, useWindowDimensions, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -68,6 +69,7 @@ export function ActivityView({
   const motionScroll = useTabMotionScroll(screen)
   const [actionsHeight, setActionsHeight] = useState(0)
   const morph = useHabitMorph()
+  const prepare = usePrepareNativeTabMotion()
   const card = [s.card, { backgroundColor: theme.surface }]
   const firstCard = [
     ...card,
@@ -148,6 +150,57 @@ export function ActivityView({
                     <HabitMorphContent item={item} />
                   </View>
                 </View>
+                {session.scopes.includes('habits:write') && (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Prévoir un repos"
+                    onPress={() => {
+                      prepare(`/rest/${id}`, screen)
+                      router.push({
+                        pathname: '/rest/[id]',
+                        params: { id, date: item.local_date },
+                      })
+                    }}
+                    style={{
+                      minWidth: 48,
+                      minHeight: 48,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 3,
+                    }}
+                  >
+                    <Icon
+                      name={{ ios: 'bed.double', android: 'bed' }}
+                      size={18}
+                      color={theme.text}
+                    />
+                    <Copy style={{ fontSize: 12 }}>Repos</Copy>
+                  </Pressable>
+                )}
+                {session.scopes.includes('habits:write') && (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Modifier l’habitude"
+                    onPress={() => {
+                      prepare(`/edit/${id}`, screen)
+                      router.push({ pathname: '/edit/[id]', params: { id } })
+                    }}
+                    style={{
+                      minWidth: 54,
+                      minHeight: 48,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 3,
+                    }}
+                  >
+                    <Icon
+                      name={{ ios: 'pencil', android: 'edit' }}
+                      size={18}
+                      color={theme.text}
+                    />
+                    <Copy style={{ fontSize: 12 }}>Modifier</Copy>
+                  </Pressable>
+                )}
               </View>
               <Copy style={{ color: theme.secondary, fontSize: 13 }}>
                 {categories[item.habit.category]} ·{' '}
@@ -155,6 +208,12 @@ export function ActivityView({
                   ? 'Cette semaine'
                   : 'Aujourd’hui'}
               </Copy>
+              {!!model.plannedVersions.length && (
+                <Copy style={{ color: theme.secondary, fontSize: 13 }}>
+                  Changements prévus le{' '}
+                  {model.plannedVersions[0]!.effective_from}.
+                </Copy>
+              )}
               <View
                 accessibilityRole="progressbar"
                 accessibilityValue={{
@@ -240,6 +299,7 @@ export function ActivityView({
               item={item}
               entries={entries}
               canRead={session.scopes.includes('entries:read')}
+              canWrite={session.scopes.includes('entries:write')}
             />
           </>
         )}
@@ -300,6 +360,7 @@ export function ActivityView({
                   finishAction,
                 }}
                 canWrite={session.scopes.includes('entries:write')}
+                resting={model.resting}
               />
             </FormScrollView>
           </View>

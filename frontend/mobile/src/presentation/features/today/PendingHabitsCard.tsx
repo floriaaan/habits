@@ -27,6 +27,9 @@ type Props = Pick<
   | 'notice'
   | 'refresh'
   | 'canWrite'
+  | 'canManageRest'
+  | 'openHabitMenu'
+  | 'restRemoving'
 > & { compact: boolean }
 export function PendingHabitsCard({
   day,
@@ -43,6 +46,9 @@ export function PendingHabitsCard({
   refresh,
   canWrite,
   compact,
+  canManageRest,
+  openHabitMenu,
+  restRemoving,
 }: Props) {
   const theme = useTheme(),
     focused = useIsFocused()
@@ -127,6 +133,28 @@ export function PendingHabitsCard({
               </Copy>
             </View>
           </View>
+          {canManageRest && (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`Options de ${item.habit.name}`}
+              disabled={
+                !!restRemoving || dashboard.isFetching || history.isFetching
+              }
+              onPress={() => openHabitMenu(item)}
+              style={{
+                minWidth: 44,
+                minHeight: 48,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Icon
+                name={{ ios: 'ellipsis', android: 'more_horiz' }}
+                size={21}
+                color={theme.greenText}
+              />
+            </Pressable>
+          )}
           {!historical && (
             <Button
               accessibilityLabel={

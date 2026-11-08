@@ -219,3 +219,35 @@ Appearance opens a native alert with System, Light and Dark choices. The prefere
 ## Progression links and proposals
 
 The pink Home statistics card opens `/progress?section=overview`; the green regularity card and flame badge open `section=regularity`. These links reuse shared tab navigation and its vertical-only motion. Hydration still opens its habit detail. The selected Progression composition uses B’s rolling seven-/thirty-day selector, pink smooth chart and complete daily-value list. A’s green regularity card replaces B’s regularity block, and A’s category card is added without removing another section. Regularity distinguishes the 91-day record from complete days in the selected range; its heatmap, current streak and XP use dashboard values. Category percentages explicitly describe today and expand to the category’s habits, whose rows open the existing detail. Home anchors apply once per focus or section change, so changing the period does not reset scrolling. The source mockups in `.impeccable/mocks/progression-v1/` remain archived references for this implemented hybrid, not runtime images. Native rendering remains unverified.
+
+
+## Habit creation — guided A, summary C
+
+Creation follows three steps (definition, goal, rhythm), then a tappable summary.
+It preserves the existing compact modal corners (18 points), 6-point canvas gap,
+24-point title, native inputs and fixed action area above the keyboard. Goal and
+schedule panels use existing blue/green theme roles. Personalization and advanced
+settings are disclosures rather than an always-expanded form. Fields remain
+editable after returning from the summary; no habit is created before confirmation.
+Home Assistant reminders are visibly disabled until a successful integration read
+confirms an active connection and current permission; loading and errors fail closed.
+Review findings about stale permissions and name validation are resolved; native
+rendering and keyboard behavior have not been verified on an actual device.
+
+
+Habit creation refinement: weekday selection uses one row of seven circular initial
+buttons with category tint and accessible full names. Personalization controls and
+the corresponding review row are removed; defaults remain automatic. Only the
+advanced disclosure remains. This supersedes the personalization disclosure above.
+
+
+## Habit modification and archiving — A and C
+
+The activity header opens a compact edit form through shared card morphing, with no
+native horizontal push. It reuses creation's fields and circular weekday controls.
+The effective date is inline, rather than an additional summary screen. The white
+main card follows the physical upper corners and a separate green action card
+contains Save. Archive is a discreet destructive row opening a dimmed confirmation
+sheet with 18-point top corners, scrollable content and a red confirmation action.
+Saved entries are retained; no restoration action is promised. Pending actions and
+success feedback block dismissal. Native layout and gestures remain unverified.

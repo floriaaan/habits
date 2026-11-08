@@ -275,3 +275,18 @@ test('habit charts and regularity reuse only visible matching colors in both dir
   }
   assert.equal(matchingCardSource(blue, habit, overview, 0), undefined)
 })
+
+test('welcome, login and home pair neutral cards without borrowing absent colors', () => {
+  const upper = { x: 6, y: 6, width: 390, height: 580 }
+  const lower = { x: 6, y: 600, width: 390, height: 160 }
+  const green = cardMotionKey('auth-footer', ['green', 'green-end'])
+  const welcome = { primary: upper, 'welcome-footer': lower }
+  const login = { primary: upper, [green]: lower }
+  const home = { primary: upper, [green]: lower }
+  assert.equal(matchingCardSource('primary', welcome, login, 0), upper)
+  assert.equal(matchingCardSource(green, welcome, login, 0), undefined)
+  assert.equal(matchingCardSource('primary', login, welcome, 0), upper)
+  assert.equal(matchingCardSource('welcome-footer', login, welcome, 1), undefined)
+  assert.equal(matchingCardSource(green, login, home, 0), lower)
+  assert.equal(matchingCardSource('primary', login, login, 0), upper)
+})

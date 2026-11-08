@@ -11,7 +11,11 @@ export const scopes = [
 export type Scope = (typeof scopes)[number]
 export interface Session {
   user_id: string
-  mode: 'personal_access_token' | 'service_account' | 'oidc_access_token'
+  mode:
+    | 'personal_access_token'
+    | 'service_account'
+    | 'oidc_access_token'
+    | 'mobile_session'
   scopes: Scope[]
 }
 export type Category = 'nutrition' | 'sport' | 'mind' | 'daily'
