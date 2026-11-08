@@ -20,7 +20,7 @@ Chaque publication reçoit un tag `sha-<commit complet>`. Un tag de version reç
 
 Les images contiennent les plateformes `linux/amd64` et `linux/arm64`. Chaque image
 est compilée une fois sur son runner natif (`ubuntu-24.04`, `ubuntu-24.04-arm`),
-puis testée par `scripts/docker_smoke.py --no-build`. Aucun QEMU. Les images testées
+puis testée par `backend/scripts/docker_smoke.py --no-build`. Aucun QEMU. Les images testées
 sont transmises par artefacts privés du run courant au job de publication, qui
 vérifie architecture et label de commit, les pousse puis assemble leurs digests
 avec `docker buildx imagetools create`. Une architecture en échec empêche la
@@ -46,7 +46,7 @@ l'application ; le snapshot `docs/openapi.json` reste vérifié. Les modificatio
 de code, y compris HA, passent tous les contrôles. Les runs remplacés d'une même
 branche/PR sont annulés, les tags sont préservés. Un déclenchement manuel ou le
 contrôle hebdomadaire exécute la recette complète. Voir les
-[mesures et décisions CI](decisions-ci.md).
+[mesures et décisions CI](adr/ADR-009-ci.md).
 
 ## Configuration GitHub
 

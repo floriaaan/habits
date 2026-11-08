@@ -51,6 +51,22 @@ tasks:
     cmds:
       - '{{.COMPOSE}} run --rm --no-deps dev bash --noprofile --norc'
 
+  mobile:
+    desc: Lance Expo (mode fake par défaut)
+    cmds: [pnpm mobile]
+
+  mobile:ios:
+    desc: Compile et lance le development build iOS
+    cmds: [pnpm mobile:ios]
+
+  mobile:android:
+    desc: Compile et lance le development build Android
+    cmds: [pnpm mobile:android]
+
+  mobile:check:
+    desc: Vérifie les types et les tests mobiles
+    cmds: [pnpm typecheck, pnpm test:mobile]
+
   ha:sync:
     desc: Synchronise les cartes vers un dossier HA monté (HA_WWW_DIR, www du composant pour HACS)
     requires:

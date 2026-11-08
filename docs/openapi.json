@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Habit Tracker",
-    "description": "Configurable authentication: disabled rejects private requests; local accepts the default user PAT/service-account tokens; oidc verifies RFC 9068 access tokens and tenant-scoped PATs. Global errors: 429 rate limit, 504 deadline. Max JSON body: 16384 bytes.",
+    "description": "Configurable authentication: disabled rejects private requests; local accepts the default user PAT/service-account tokens; oidc verifies RFC 9068 access tokens and tenant-scoped PATs; accounts enables email accounts and renewable mobile sessions. Global errors: 429 rate limit, 504 deadline. Max JSON body: 16384 bytes.",
     "license": {
       "name": "MIT",
       "identifier": "MIT"
@@ -39,6 +39,160 @@
             "bearer": []
           }
         ]
+      }
+    },
+    "/api/v1/auth/forgot-password": {
+      "post": {
+        "tags": [
+          "super::accounts"
+        ],
+        "operationId": "forgot",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {},
+          "429": {},
+          "503": {}
+        }
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "tags": [
+          "super::accounts"
+        ],
+        "operationId": "login",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountCredentials"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileTokens"
+                }
+              }
+            }
+          },
+          "401": {},
+          "429": {}
+        }
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "tags": [
+          "super::accounts"
+        ],
+        "operationId": "logout",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {},
+          "429": {}
+        }
+      }
+    },
+    "/api/v1/auth/refresh": {
+      "post": {
+        "tags": [
+          "super::accounts"
+        ],
+        "operationId": "refresh",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefreshRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileTokens"
+                }
+              }
+            }
+          },
+          "401": {},
+          "429": {}
+        }
+      }
+    },
+    "/api/v1/auth/register": {
+      "post": {
+        "tags": [
+          "super::accounts"
+        ],
+        "operationId": "register",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountCredentials"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {},
+          "422": {},
+          "429": {},
+          "503": {}
+        }
+      }
+    },
+    "/api/v1/auth/reset-password": {
+      "post": {
+        "tags": [
+          "super::accounts"
+        ],
+        "operationId": "reset",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {},
+          "422": {},
+          "429": {}
+        }
       }
     },
     "/api/v1/dashboard": {
@@ -2320,6 +2474,39 @@
         ]
       }
     },
+    "/api/v1/session": {
+      "get": {
+        "tags": [
+          "super::auth"
+        ],
+        "operationId": "session",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Session"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/tokens": {
       "get": {
         "tags": [
@@ -2820,6 +3007,25 @@
   },
   "components": {
     "schemas": {
+      "AccountCredentials": {
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          },
+          "timezone": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
       "ActionReceipt": {
         "type": "object",
         "required": [
@@ -3066,6 +3272,18 @@
             "format": "double"
           }
         }
+      },
+      "EmailRequest": {
+        "type": "object",
+        "required": [
+          "email"
+        ],
+        "properties": {
+          "email": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
       },
       "Entry": {
         "type": "object",
@@ -3516,6 +3734,27 @@
           "count"
         ]
       },
+      "MobileTokens": {
+        "type": "object",
+        "required": [
+          "access_token",
+          "refresh_token",
+          "expires_in"
+        ],
+        "properties": {
+          "access_token": {
+            "type": "string"
+          },
+          "expires_in": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "refresh_token": {
+            "type": "string"
+          }
+        }
+      },
       "NewEntry": {
         "type": "object",
         "required": [
@@ -3727,6 +3966,38 @@
           "home_assistant"
         ]
       },
+      "RefreshRequest": {
+        "type": "object",
+        "required": [
+          "refresh_token"
+        ],
+        "properties": {
+          "refresh_token": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ResetRequest": {
+        "type": "object",
+        "required": [
+          "email",
+          "code",
+          "password"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
       "RestException": {
         "type": "object",
         "description": "An excluded local date, never a successful completion.",
@@ -3824,6 +4095,39 @@
             "format": "date-time"
           }
         }
+      },
+      "Session": {
+        "type": "object",
+        "description": "Public view of the authenticated principal; never serializes credentials.",
+        "required": [
+          "user_id",
+          "mode",
+          "scopes"
+        ],
+        "properties": {
+          "mode": {
+            "$ref": "#/components/schemas/SessionMode"
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Scope"
+            }
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "SessionMode": {
+        "type": "string",
+        "enum": [
+          "personal_access_token",
+          "service_account",
+          "oidc_access_token",
+          "mobile_session"
+        ]
       },
       "Sport": {
         "type": "string",

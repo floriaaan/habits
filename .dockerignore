@@ -7,3 +7,9 @@ backups
 .DS_Store
 
 **/node_modules
+
+**/target
+**/.expo
+**/dist
+**/.env
+frontend

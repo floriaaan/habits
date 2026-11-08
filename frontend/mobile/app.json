@@ -1,0 +1,37 @@
+{
+  "expo": {
+    "name": "Habits",
+    "slug": "habits",
+    "scheme": "habits",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "experiments": {
+      "typedRoutes": true
+    },
+    "ios": {
+      "bundleIdentifier": "dev.floriaaan.habits",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "dev.floriaaan.habits",
+      "softwareKeyboardLayoutMode": "resize"
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-dev-client",
+      "expo-router",
+      "expo-status-bar",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0c1011",
+          "dark": {
+            "backgroundColor": "#0c1011"
+          }
+        }
+      ],
+      "@react-native-community/datetimepicker"
+    ]
+  }
+}

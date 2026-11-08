@@ -1,0 +1,7 @@
+{
+  "tool": "image_gen.imagegen",
+  "prompt": "Edit this Habits Aujourd’hui native UI mockup. Change only the following: remove the green badge containing '53 %' at top right next to Aujourd’hui and remove the blue badge containing '32 %' at right next to Votre journée. Replace those two badge areas with the continuous surrounding offwhite/pale-blue card backgrounds. They were composition annotations accidentally rendered as UI, not valid product data. Preserve every other element, French text, card geometry, colors, typography, status bar, native bottom dock and home indicator exactly. No new labels, percentages, buttons, decorations or claims.",
+  "reference": ".impeccable/mocks/today/journal.png",
+  "approved": false,
+  "created": "2026-11-06"
+}

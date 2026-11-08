@@ -7,18 +7,20 @@ instance Pocket ID/Strava/HA réelle, CI GitHub ou publication GHCR n'est simul�
 ## Contrôles
 
 ```sh
+cd backend
 cargo fmt --all -- --check
 cargo clippy --locked --all-targets --all-features -- -D warnings
 cargo test --locked --all-targets
 cargo build --locked --release
 cargo run --locked -- openapi > /tmp/openapi.json
-diff -u docs/openapi.json /tmp/openapi.json
+diff -u ../docs/openapi.json /tmp/openapi.json
 python3 scripts/check_domain_boundaries.py
 cargo audit --deny warnings
 cargo deny --locked check
+cd ..
 actionlint
 docker compose config --quiet
-python3 scripts/docker_smoke.py
+python3 backend/scripts/docker_smoke.py
 git diff --check
 ```
 
@@ -109,7 +111,7 @@ Vérifications relancées en Rust 1.99.1 sur macOS arm64 :
   `cargo clippy --locked --all-targets --all-features -- -D warnings` et
   `cargo build --locked --release` : succès.
 - `cargo run --locked -- openapi` : snapshot régénéré, diff identique ;
-  `python3 scripts/check_domain_boundaries.py` et `git diff --check` : succès.
+  `python3 backend/scripts/check_domain_boundaries.py` et `git diff --check` : succès.
 - Création/lecture/liste des quatre catégories avec PAT réel, défaut `daily`,
   isolation et rejet des valeurs invalides ; catégorie future appliquée à sa
   date d'effet, historique et XP conservés.
@@ -313,7 +315,7 @@ Compose est statique. Aucun service de production ni Home Assistant personnel n'
 
 Le mainteneur a remplacé le fichier de production par un bloc Compose intégré
 aux README EN/FR et demandé l'affichage automatique du premier PAT local.
-Voir [décision et exception de journalisation](decisions-auto-bootstrap.md).
+Voir [décision et exception de journalisation](adr/ADR-011-auto-bootstrap.md).
 
 - `cargo test --locked --all-targets` : **64 tests réussis** (62 unitaires et
   2 tests du vrai processus serveur). Les nouveaux tests prouvent une seule
@@ -482,3 +484,194 @@ fournisseur externe. Aucun secret réel ni Home Assistant personnel n'est utilis
 - [Release HACS v0.3.1](https://github.com/floriaaan/habit-tracker-ha/releases/tag/v0.3.1)
   avec le ZIP vérifié ci-dessus. Mise à jour backend nécessaire pour set_value ;
   pas de nouveau scope ni de migration. Aucune instance HA personnelle modifiée.
+
+
+## Monorepo et mobile — 2026-11-05
+
+- **71 tests Rust réussis** (68 unitaires, 1 observabilité, 2 démarrage). Session : PAT, scopes sans droit de lecture métier, expiration, révocation, compte de service, disabled et tenants OIDC isolés.
+- Fmt, Clippy tous targets/features avec warnings refusés, OpenAPI régénéré et comparaison au snapshot : succès.
+- Vérification de préservation : 63 fichiers du crate déplacés, dont seuls les quatre fichiers HTTP/tests prévus pour la session diffèrent. Les sept migrations et Cargo.lock sont identiques au commit de départ.
+- **11 tests unitaires mobiles réussis**, plus **1 test du connector HTTP contre un processus Rust réel réussi** (base temporaire indépendante). Ce dernier est ignoré dans la commande sans `HABITS_BACKEND_BIN` et a été exécuté séparément avec ce paramètre.
+- TypeScript strict, `expo install --check`, installation pnpm depuis le lockfile et export des bundles **iOS/Android** : succès. Versions retenues : Expo 58.0.23, React Native 0.88.1 et React 19.3.0.
+- Simulateur **iPhone 18 Pro Max / iOS 27**, Expo Go SDK 58 : application ouverte, parcours fake exercé via les handlers React dans l'inspecteur Hermes (création « Test iOS », validation d'une habitude, dashboard à 10 XP). Rendu natif inspecté par capture ; un espace JSX hors Text détecté puis corrigé. Ce contrôle ne prouve pas une saisie tactile/clavier complète ni les redirects d'un development build.
+- Frontières du domaine, 3 tests d'archives HACS, 2 tests de politique CI, actionlint et validation des deux configurations Compose : succès.
+- Les **7 tests Home Assistant** affichent `OK`, mais le processus Python 3.14.3 local sort avec le code **139** après les tests. Réexécution avec faulthandler : segmentation fault pendant `Garbage-collecting`, `dictkeys_decref` / `finalize_modules` / `_Py_Finalize`. Le run complet HA n'est donc pas déclaré vert ; la cause précise du crash natif reste non déterminée. Le job Linux HA est conservé en CI.
+- Le moteur Docker/OrbStack est arrêté sur ce poste : build/smoke conteneur et restauration du volume non exécutés pour cette tranche. Les noms/projets/volumes existants sont conservés dans Compose ; aucun volume de données n'a été déplacé ou effacé.
+- Aucun fournisseur OIDC cible n'est configuré : vérifications JWT/JWKS Rust et tests de callback/refresh client réussis, mais aucun login natif interactif complet avec fournisseur réel ou serveur OAuth de test. Pocket ID, Strava et HA personnels n'ont pas été contactés.
+
+
+## Accueil mobile V4 — 2026-11-06
+
+- Expo Router 58.0.30 : layout partagé, Tabs produit, modale de création, détail d’habitude et console avancée conservée.
+- **13 tests mobiles réussis**, dont deux tests du modèle d’accueil et des fixtures interactives. Le test HTTP/Rust est ignoré sur ce run sans `HABITS_BACKEND_BIN` ; son résultat précédent est conservé ci-dessus. TypeScript strict et exports iOS/Android réussis après les corrections.
+- Captures natives Expo Go 58 sur **iPhone 18 Pro Max et iPad Pro 13 pouces, iOS 27** : clair, sombre, accessibilité grande taille, bas de page en texte agrandi. Création « Marche du soir » et incrément d’eau 1500 → 1750 mL confirmés via handlers React/Hermes. Ce ne sont pas des tests de taps physiques. L’accès agent-device T3 est désactivé dans cet environnement.
+- Revue indépendante initiale `fix`, puis verdict ciblé **ship : 4/4 corrections résolues** (reflow du texte agrandi, sélection du dock, gouttière hydratation–dock, vacance du panneau supérieur iPad). Ce verdict porte sur la liste de corrections, pas sur une validation globale du produit.
+- Comparaison automatique avec la comp V4 : environ **68 %**, état `drift`. Le gate pixel n’est pas passé et n’a pas été forcé. Les données, pictogrammes et proportions de la zone système diffèrent entre comp et capture native. Preuves dans `frontend/mobile/.impeccable/review/`, dont les crops et rapports de diff.
+- Aucun émulateur Android disponible : export réussi uniquement, pas de validation visuelle Android. Indicateur de gestes natif absent des captures Expo Go malgré les insets et `autoHideHomeIndicator: false` : contrôle en application native autonome toujours requis ; aucune fausse barre n’a été dessinée. VoiceOver et gestes sur matériel non vérifiés.
+- Trois maquettes Aujourd’hui générées avec l’outil intégré imagegen, ancrées sur la V4. Elles restent des propositions et ne déclenchent pas d’implémentation sans choix du mainteneur. Prompts et provenance conservés avec les images.
+
+
+## Ajustement iPhone 17 Pro — 2026-11-06
+
+- Effets de bord natifs désactivés dans le Stack ; suppression des dots et de leur rangée dans le dock. Pagination conservée à côté d’Ajouter.
+- Hauteurs minimales calculées à partir de la hauteur mesurée du ScrollView au-dessus du dock, avec typographie et illustration plus compactes. Le texte agrandi conserve le défilement.
+- TypeScript et 13 tests mobiles réussis (intégration HTTP ignorée sans binaire backend). Contrôle des espaces git réussi.
+- Vérification visuelle finale sur le nouveau simulateur iPhone 17 Pro non aboutie : disque temporairement plein, puis confirmation système « Open in Expo Go » bloquante. L’accès agent-device T3 et l’envoi de touches système sont désactivés. Aucun résultat visuel sur ce modèle n’est revendiqué.
+
+## Modale d’ajout C — 2026-11-07
+
+- **14 tests mobiles réussis**, un test HTTP/Rust ignoré sans binaire backend ; TypeScript strict réussi.
+- TypeScript strict et exports finaux iOS/Android réussis après les derniers garde-fous et l’ajustement de couleur du bouton principal. L’export prouve la génération des bundles, pas leur rendu natif.
+- Revue de code indépendante : verdict ciblé **ship, 2/2 corrections résolues**. Ce verdict ne constitue pas une validation visuelle native.
+- Aucun simulateur lancé, conformément à la demande du mainteneur. Rendu natif et comportement du clavier non vérifiés pour cette modale.
+
+
+## Aujourd’hui A + sélecteur B — 2026-11-07
+
+- Quatrième onglet `/today`, journal des saisies réelles, actions rapides du jour courant et sélection de semaine sur les 90 dernières dates. Historique des habitudes actives en lecture seule ; noms/unités versionnés et bilans calculés à partir des statistiques du jour. Une couverture hebdomadaire tronquée est signalée comme indisponible.
+- **18 tests mobiles réussis**, un test HTTP/Rust ignoré sans `HABITS_BACKEND_BIN`. Tests finaux, TypeScript strict et exports iOS/Android réussis après le dernier garde-fou de couverture hebdomadaire et son assertion de régression.
+- Revue de code indépendante ciblée : problème P2 initial corrigé, verdict **ship** sur le code examiné. Ce verdict ne constitue pas une validation visuelle native.
+- Aucun simulateur lancé, conformément à la demande du mainteneur. Rendu natif iOS/Android, gestes, VoiceOver et texte agrandi non vérifiés sur cet écran. L’export prouve la génération des bundles uniquement.
+
+## Navigation entre jours — 2026-11-07
+
+- Swipe horizontal : seuil de distance et dominante horizontale, un doigt, bornes des dates et suivi de semaine. Régression testée aux changements de mois et aux limites, ainsi que sur les gestes courts/verticaux.
+- Suppression de la carte de succès ; annonce accessible conservée. Rafraîchissement depuis le titre du bilan avec état de chargement et blocage des appuis répétés.
+- Transition de jour via Animated natif, avec écoute du réglage système de réduction des animations. Aucun paquet supplémentaire ni morphing entre routes ajouté.
+- 19 tests réussis, 1 intégration HTTP ignorée sans binaire Rust. TypeScript et exports finaux iOS/Android réussis. Gestes et animation non vérifiés sur appareil : aucun simulateur utilisé.
+
+- Revue ciblée : capture du swipe limitée au corps du journal pour préserver le défilement horizontal du sélecteur sur petit écran ; correction confirmée par revue de code.
+
+
+## Morphing accueil–détail et maquettes de bienvenue — 2026-11-07
+
+- Morphing limité aux lignes d’habitudes de l’accueil et à la carte d’en-tête du détail, avec retour depuis le bouton d’en-tête. Overlay dans une `Modal` native, rectangles mesurés, Reanimated 4.7.1 et Worklets 0.13.0 ; aucun Shared Element Transition expérimental activé dans le navigateur Tabs. Hydratation, liens directs et gestes de retour conservent leur navigation normale.
+- Réduction des animations, rectangles invalides/hors écran, délais de secours des mesures et de l’overlay, et nettoyage à la déconnexion sont traités dans le code. Les tests de géométrie vérifient les valeurs non finies, dimensions nulles et limites de l’écran ; ils ne prouvent pas le cycle de vie natif de la Modal.
+- Contrôles finaux après les ajustements du garde-fou et de l’opacité : **20 tests mobiles réussis**, un test HTTP/Rust ignoré sans `HABITS_BACKEND_BIN` ; TypeScript strict et exports iOS/Android réussis.
+- Revue de code indépendante ciblée : le P2 concernant une navigation absorbée par le garde-fou a été corrigé ; verdict **ship** sur le code examiné. Ce verdict ne constitue pas une validation visuelle native.
+- Aucun simulateur lancé, conformément à la demande du mainteneur. Morphing, superposition de la Modal, safe areas, gestes, VoiceOver et texte agrandi non vérifiés sur appareil. Les exports prouvent uniquement la génération des bundles.
+- Trois propositions de bienvenue A (aperçu), B (rituel) et C (calme) ont été générées avec imagegen depuis `quiet-v1/home.png`. Images, prompts et provenance dans `frontend/mobile/.impeccable/mocks/welcome-v1/`. Aucune sélection ni implémentation ; le bouton de démonstration reste conditionné à la configuration, les connectors fake et HTTP étant exclusifs. Aucun nouveau parcours d’inscription email ni sélecteur d’instance.
+
+## Morphing entre onglets — 2026-11-07
+
+- Le dock et les liens Accueil → Progression capturent les rectangles visibles via refs natives avant navigation. Les surfaces de destination animent largeur, hauteur et origine avec une entrée Reanimated de 360 ms ; rôles correspondants, puis repli principal/première carte. Les dégradés restent des fonds absolus statiques, sans Modal, image instantanée ou shared tag pour ce trajet.
+- Le focus remonte les surfaces natives, y compris sur les onglets déjà visités. L’état React des écrans est conservé ; les positions de défilement natives enfants peuvent être réinitialisées. Réduction des animations et mesures inexploitables conservent la navigation normale. Les liens directs et le retour système ne capturent pas de géométrie.
+- Contrôles finaux : **22 tests mobiles réussis**, un test HTTP/Rust ignoré sans `HABITS_BACKEND_BIN` ; TypeScript strict et exports iOS/Android réussis après les derniers ajustements des fonds absolus et des liens Accueil → Progression. Les tests couvrent le découpage des rectangles visibles et la conversion de géométrie vers le repère de destination.
+- Revue de code indépendante ciblée : verdict **ship** sur le code examiné. Aucun simulateur lancé, conformément à la demande du mainteneur ; rendu du morphing, gestes, safe areas, VoiceOver et texte agrandi non vérifiés sur appareil. Les exports prouvent uniquement la génération des bundles.
+
+
+## Bienvenue V3 simplifiée — 2026-11-07
+
+- Direction B simplifiée approuvée et implémentée : illustration décorative en vues natives, symboles de plateforme et SVG, exclue de l’accessibilité ; un seul CTA « Se connecter » ouvre `/login`. Les cartes « Avancer » / « À son rythme » et le lien de démonstration sont supprimés.
+- La connexion réutilise les parcours PAT/OIDC et fake existants. Le mode simulé est expliqué sur `/login`. Le dashboard s’affiche directement pour une session valide restaurée ; la bienvenue couvre l’absence de session, la restauration et son indisponibilité. La console avancée est conservée.
+- Contrôles finaux : **22 tests mobiles réussis**, un test HTTP/Rust ignoré sans `HABITS_BACKEND_BIN` ; TypeScript strict et exports iOS/Android réussis. Aucun nouveau test ajouté pour cette modification d’interface et de routage limitée ; les parcours d’authentification réutilisés disposent de tests existants.
+- Revue indépendante ciblée du code : aucun défaut relevé. Ce résultat ne prouve pas le rendu natif. Thème sombre, zones sûres, défilement du texte agrandi et décoration masquée aux lecteurs d’écran sont traités dans le code ; l’indicateur de gestes reste natif.
+- Aucun simulateur lancé, conformément à la demande du mainteneur. Apparence native iOS/Android, VoiceOver, texte agrandi, zones sûres et comportement du clavier non vérifiés pour ce parcours. Les exports prouvent uniquement la génération des bundles.
+
+
+## Morphing apaisé et défilement sous le dock — 2026-11-07
+
+- Les transitions entre onglets associent uniquement les cartes de même rôle. Leur origine reste fixe ; les dimensions de départ sont bornées à ±8 % en largeur et ±12 % en hauteur, puis rejoignent les dimensions finales en 260 ms avec ralentissement cubique. La réduction des animations reste respectée.
+- Le dock est une superposition absolue au-dessus des ScrollView pleine hauteur, sans fond rectangulaire derrière ses coins arrondis. Un espacement de fin égal à sa hauteur plus 6 points garde les derniers contrôles accessibles. Le calcul des hauteurs de cartes de l’accueil déduit la hauteur du dock.
+- TypeScript strict et exports iOS/Android réussis ; **23 tests mobiles réussis**, un test HTTP/Rust ignoré sans `HABITS_BACKEND_BIN`. Les tests vérifient notamment les limites de dimensions et l’origine fixe du morphing. Les exports prouvent uniquement la génération des bundles.
+- Aucun simulateur utilisé. Le rendu natif des transitions, le passage visuel du contenu sous les coins du dock et les gestes restent à vérifier sur appareil.
+
+
+## Dock Liquid Glass, largeur stable et effets de bord — 2026-11-07
+
+- Les cartes occupant au moins 90 % de la largeur de l’écran aux deux extrémités du morphing gardent leur largeur finale. Un écart inférieur à 2 points ne déclenche pas non plus de variation de largeur. Les autres limites de mouvement et le filtrage des cartes visibles restent en place.
+- Le dock utilise `expo-glass-effect` en matériau natif `regular`, après vérification des deux API de disponibilité, avec surface opaque de secours. Le development client doit être reconstruit pour intégrer ce nouveau module natif.
+- Les ScrollView de l’accueil, d’Aujourd’hui et des pages partagées sont explicitement marquées par `ScrollViewMarker` et leurs effets de bord sont masqués, afin de retirer le voile automatique en haut. L’overscroll de l’accueil révèle une étincelle et « Même les habitudes prennent une pause. », décoration exclue de l’accessibilité.
+- TypeScript strict, exports iOS/Android et **25 tests mobiles réussis**, un test HTTP/Rust ignoré sans `HABITS_BACKEND_BIN`. Le test de géométrie couvre la stabilité des largeurs proches et pleine largeur. Revue indépendante ciblée du code : aucun défaut bloquant relevé. Les exports prouvent uniquement la génération des bundles.
+- Aucun simulateur utilisé. L’effet de bord natif est la cause supposée du voile : le garde-fou est implémenté, sans preuve visuelle de sa disparition. Le rendu natif Liquid Glass, la barre de statut et l’easter egg restent à vérifier sur appareil ; les tests de géométrie ne prouvent pas leur rendu.
+
+
+## Dock SwiftUI natif — 2026-11-07
+
+- Remplacement du dock `expo-glass-effect` décrit dans la validation précédente par une arborescence SwiftUI complète via `@expo/ui` 58.0.27 : `Host`, `HStack`, `Button`, `Image` et `glassEffect` natif en variante `regular` interactive sur iOS 26 et versions ultérieures. La dépendance `expo-glass-effect` est supprimée.
+- Navigation Expo Router et capture des morphings conservées dans les callbacks des boutons. Les autres plateformes et versions iOS utilisent le dock opaque React Native existant.
+- TypeScript strict, exports iOS/Android et **25 tests mobiles réussis**, un test HTTP/Rust ignoré sans `HABITS_BACKEND_BIN`. Les exports prouvent uniquement la génération des bundles.
+- Aucun simulateur ni build natif exécuté. Le development client doit être reconstruit ; rendu Liquid Glass, gestes et accessibilité restent à vérifier sur appareil.
+
+### Correction du crash ScrollViewMarker
+
+- La création Fabric du marqueur expérimental provoquait une exception. Le podspec de react-native-screens 4.30.1 exclut son implémentation sans `RNS_GAMMA_ENABLED=1` et compile un stub à la place.
+- Suppression de cet import et remplacement du marqueur par une View standard. Le dock SwiftUI et les options `scrollEdgeEffects` du Stack restent inchangés. Les descriptions antérieures du marqueur sont historiques, pas une validation de sa disponibilité native.
+- Aucun simulateur utilisé. Le rendu du haut de l’écran reste à vérifier sur appareil.
+
+
+## Barre d’onglets iOS système et arrêt du morphing horizontal — 2026-11-07
+
+- Remplacement des boutons SwiftUI personnalisés par `NativeTabs` de `expo-router/native-tabs` sur iOS : quatre destinations, barre cachée avant authentification, sans minimisation automatique. Le dock devient un fond blanc arrondi sous la barre système ; les autres plateformes gardent le dock React Native. `@expo/ui` est supprimé.
+- La revue a identifié une capture différée inadaptée aux onglets natifs : `tabPress` invalide désormais les transitions personnalisées et laisse le système gérer la sélection, sans morphing personnalisé. Les liens applicatifs et le dock React Native conservent le morphing vertical : largeur et origine restent fixes. L’overlay du détail conserve aussi sa position horizontale et sa largeur ; le swipe de journée intentionnel reste inchangé.
+- `ScrollViewport` place une surface opaque fixe derrière la barre de statut iOS. Les options stables du Stack désactivant les effets de bord sont conservées ; aucun marqueur expérimental n’est réintroduit.
+- TypeScript strict et **25 tests mobiles réussis**, un test HTTP/Rust ignoré sans `HABITS_BACKEND_BIN`.
+- Aucun simulateur utilisé. Le rendu de la barre système sur le dock blanc, la disparition du voile et les gestes restent à vérifier sur appareil.
+
+
+## Marges physiques et hauteur du dock natif — 2026-11-07
+
+- Suppression du calque opaque de barre de statut décrit dans la validation précédente : il coupait visuellement le titre. `ScrollViewport` reste une View standard, sans marqueur Gamma. Les options stables du Stack masquent toujours les effets de bord.
+- `DeviceInsetsProvider`, sous le SafeAreaProvider racine et au-dessus du Stack/NativeTabs, capture les marges physiques de fenêtre. Accueil, Aujourd’hui, Page/Dock, Welcome et TabCardMotion utilisent ces marges plutôt que les marges locales des onglets incluant leur barre native. Le dock réserve `56 + max(marge basse physique, 8)` points, soit 90 pour une marge de 34 ; l’accueil réserve la marge haute physique plus 12 points.
+- L’easter egg est positionné en absolu à −54 points dans le ScrollView, au lieu de le précéder comme premier enfant. Le ScrollView reste ainsi le premier descendant natif détectable par le Stack.
+- TypeScript et 25 tests passent ; un test d’intégration HTTP/Rust est ignoré en l’absence de binaire backend. Exports iOS/Android réussis. Aucun simulateur utilisé ; le rendu du haut, de la barre native et des gestes reste à vérifier sur appareil.
+
+
+## Dock sombre, easter egg fixe et animation au focus — 2026-11-07
+
+- Le fond du dock iOS suit le thème : blanc en clair, noir `#0c1011` en sombre. Les icônes et la teinte de sélection de NativeTabs utilisent la couleur de texte du thème.
+- L’easter egg de l’accueil est désormais un frère fixe après `ScrollViewport`, à la marge physique haute + 20 points. Il ne se déplace pas avec le contenu ; seule son opacité est interpolée par le pilote natif entre une traction de marge haute + 96 et + 140 points, sans état React par événement de scroll. Il reste exclu de l’accessibilité.
+- Le focus d’un onglet natif réactive une entrée locale des seules cartes visibles : hauteur de 104 à 100 %, opacité de 0,94 à 1, 260 ms, sans variation horizontale ni déplacement d’origine. Les liens applicatifs conservent leur morphing vertical capturé. La préférence système de réduction des animations est réactive et considérée active avant sa résolution native.
+- TypeScript et **25 tests mobiles réussis** ; un test HTTP/Rust ignoré sans `HABITS_BACKEND_BIN`. Exports iOS/Android réussis.
+- Trois propositions de splash plein écran sont présentées dans `.impeccable/mocks/splash-v1` : A « Souffle » recommandé, B « Cartes », C « Un jour ». Elles ne sont pas implémentées.
+- Aucun simulateur utilisé. Le rendu sombre de la barre native, l’overscroll et les animations restent à vérifier sur appareil ; tests et exports ne prouvent pas le rendu natif.
+
+
+## Splash B « Les cartes » — 2026-11-07
+
+- Choix B intégré dans `LaunchSplash` : trois bandes pastel, pile puis composition d’accueil en cinq surfaces, animation de 760 ms et fondu de 190 ms. Modal native plein écran au-dessus de la barre d’onglets, thème et marges physiques pris en compte ; barre de statut masquée uniquement pendant la séquence.
+- `expo-splash-screen` 58.0.13 et son plugin fournissent le splash initial statique noir, maintenu jusqu’à l’affichage de la Modal. L’application ou la bienvenue se monte dessous sans attendre de réseau ni d’authentification ; séquence une fois par montage racine. Réduction des animations, repli de lecture à 200 ms, garde-fou de 2,5 secondes dès le montage et annulation au démontage traités dans le code.
+- TypeScript strict et **26 tests mobiles réussis**, un test HTTP/Rust ignoré sans `HABITS_BACKEND_BIN`. Le test ajouté vérifie la géométrie des surfaces ; il ne prouve ni le cycle de vie natif du splash ni son rendu. Les exports iOS/Android finaux sont réussis.
+- Aucun simulateur utilisé. Reconstruction native nécessaire pour le plugin ; lancement, fondu, barre de statut, réduction des animations et rendu sombre restent à vérifier sur appareil dans une build release. Expo Go et le development client ne reproduisent pas complètement le splash de production.
+
+
+## Accès direct en mode démo — 2026-11-07
+
+- Le connector fake restaure automatiquement sa session locale via `getSession`. L’accueil s’ouvre directement après le splash B existant, sans bienvenue ni connexion ; aucune bienvenue n’est rendue pendant la restauration fake. Le parcours HTTP conserve sa bienvenue avant connexion.
+- Le profil masque la déconnexion en mode fake et conserve la remise à zéro des données simulées. Les propositions de refonte du profil restent des maquettes, sans implémentation de cette refonte.
+- TypeScript strict et **26 tests mobiles réussis** ; un test HTTP/Rust ignoré sans `HABITS_BACKEND_BIN`. Exports iOS/Android réussis.
+- Aucun simulateur utilisé. Ces contrôles ne prouvent pas le rendu ni le démarrage sur appareil.
+
+
+## Profil A « L’essentiel » — 2026-11-07
+
+- Proposition A intégrée dans `ProfileScreen`, réexporté par la route `/profile` : identité de session, carte verte « Mon parcours », réglages compacts. Le dashboard existant fournit niveau et XP, avec garde de permissions `statistics:read` et `habits:read`, chargement, erreur et réessai ; aucune statistique inventée.
+- Préférence locale Système / Clair / Sombre via alerte native, persistée dans SecureStore (`habits.appearance.v1`) et appliquée par `Appearance`. La connexion affiche les données de session sans requête de santé ; les outils ouvrent `/console`. Réinitialisation fake avec confirmation, déconnexion HTTP avec protection pendant l’opération.
+- Thèmes, marges physiques, défilement sous le dock et motion partagés réutilisés. TypeScript strict et **26 tests mobiles réussis** ; un test HTTP/Rust ignoré sans `HABITS_BACKEND_BIN`. Exports iOS/Android réussis. Revue indépendante ciblée du code : aucun défaut bloquant relevé. Les exports prouvent la génération des bundles, pas le rendu natif.
+- Aucun simulateur utilisé. Les contrôles de code ne prouvent pas le rendu natif : dock, alertes, persistance après relancement, VoiceOver, texte agrandi et thème sombre restent à vérifier sur appareil.
+
+
+## Progression : liens, données démo et courbes — 2026-11-07
+
+- Carte rose de l’accueil vers `section=overview` ; carte verte et flamme vers `section=regularity`, avec ancre sur la page Progression existante. Navigation partagée et motion verticale conservées ; lien Hydratation vers le détail inchangé.
+- Courbe cubique monotone commune à l’accueil et à Progression, bornée sans dépassement et interrompue aux dates manquantes. Le fake fournit sept jours de saisies UTC réalistes par pas arrondis ; graphiques, totaux, XP et séries dérivent de ces entrées. Pas de modification des données HTTP.
+- TypeScript strict et **30 tests mobiles réussis** ; un test HTTP/Rust ignoré sans `HABITS_BACKEND_BIN`. Exports iOS/Android réussis.
+- Les maquettes A/B/C de `frontend/mobile/.impeccable/mocks/progression-v1/` restent des propositions en attente de choix, sans implémentation de la refonte visuelle.
+- Aucun simulateur utilisé ni rendu natif vérifié ; ces contrôles de code ne prouvent pas le rendu, l’accessibilité ou les interactions sur appareil.
+
+
+## Progression B + régularité et catégories de A — 2026-11-07
+
+- `ProgressScreen`, réexporté par `/progress`, implémente B avec sélection des 7 ou 30 derniers jours, courbe rose lissée et liste complète des valeurs journalières. La régularité verte de A remplace celle de B ; les catégories de A sont ajoutées sans supprimer une autre section.
+- Record sur 91 jours, jours complets de la période, grille, série actuelle et XP utilisent les données du dashboard. Les catégories sont explicitement celles d’aujourd’hui et ouvrent les habitudes puis leur détail. Les ancres de l’accueil restent en place et ne réinitialisent pas le défilement lors d’un changement de période.
+- Le fake fournit trente jours de saisies UTC arrondies au pas des objectifs, avec versions d’habitudes couvrant ces dates. Ses tableaux hebdomadaires conservent sept jours courants et sept précédents ; les moyennes dérivent des valeurs réelles. Données HTTP inchangées.
+- TypeScript strict et **32 tests mobiles réussis** ; un test HTTP/Rust ignoré sans `HABITS_BACKEND_BIN`. Exports finaux iOS/Android réussis ; ils prouvent uniquement la génération des bundles.
+- Aucun simulateur utilisé ni rendu natif vérifié. Les tests de modèle et exports ne prouvent pas le rendu, la navigation, VoiceOver, le texte agrandi ou le thème sombre sur appareil. Les maquettes originales sont archivées, le choix hybride étant désormais implémenté.
+
+
+## Morphings rétablis, y compris les cartes colorées — 2026-11-07
+
+- Les changements d’onglet natifs capturent synchroniquement les rectangles en cache corrigés du défilement courant avant sélection. Les mesures de layout alimentent le cache ; aucun callback de mesure tardif ne déclenche une seconde sélection ou un remontage différé. Les liens applicatifs conservent la capture asynchrone.
+- Cartes blanches associées par rôle, cartes colorées par palette réelle. Surface et dégradé animent leur hauteur sur 300 ms, avec origine et largeur fixes, amplitude capturée bornée à ±12 %, opacité de 0,98 à 1 et entrée locale de 108 à 100 % sans source correspondante. Les cartes insuffisamment visibles aux deux extrémités sont exclues ; réduction des animations réactive et active par défaut avant résolution native.
+- TypeScript strict et **34 tests mobiles réussis** ; un test HTTP/Rust ignoré sans `HABITS_BACKEND_BIN`. Les tests couvrent notamment le défilement des rectangles en cache et l’association des palettes. Exports iOS/Android finaux réussis. La clé de la carte sortante reste stable pendant la préparation du prochain onglet.
+- Aucun simulateur utilisé ni rendu natif vérifié. Les contrôles de code ne prouvent pas le rendu des transitions, VoiceOver ou le texte agrandi sur appareil.

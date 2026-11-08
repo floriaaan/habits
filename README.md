@@ -8,7 +8,7 @@ Habit Tracker is a Rust REST API backed by SQLite. Track daily routines and spor
 record check-ins, and follow goals, streaks, statistics and XP. Boolean, quantity,
 duration and frequency habits support schedules, rest days and IANA time zones.
 
-Use the API from scripts or connect the
+Use the [Expo mobile app](docs/mobile.md), call the API from scripts, or connect the
 [Home Assistant integration and cards](https://github.com/floriaaan/habit-tracker-ha).
 Pocket ID/OIDC, Strava and outbound Home Assistant notifications are optional.
 The backend has no standalone web interface.
@@ -237,20 +237,45 @@ task dev:shell
 
 ### Develop with a local Rust toolchain
 
-Install Rust **1.99.1**, a C compiler and CMake. Dependencies are pinned in `Cargo.lock`.
+Install Rust **1.99.1**, a C compiler and CMake. Dependencies are pinned in `backend/Cargo.lock`.
 `cargo run` does not load `.env`; export the variables you need.
 
 ```sh
-AUTH_MODE=local cargo run --locked
+cd backend
+AUTH_MODE=local DATABASE_PATH=../data/habits.sqlite cargo run --locked
 cargo fmt --all -- --check
 cargo clippy --locked --all-targets --all-features -- -D warnings
 cargo test --locked --all-targets
 cargo build --locked --release
+cd ..
 ```
 
 The repository’s `compose.yaml` builds locally; the installation snippet above pulls GHCR.
-`python3 scripts/docker_smoke.py` tests a separate local build and temporary volume.
+`python3 backend/scripts/docker_smoke.py` tests a separate local build and temporary volume.
 CI also checks audit/deny, OpenAPI, domain boundaries and both native image platforms.
+
+### Mobile app (Expo)
+
+The Rust server lives in `backend/`; the Expo app lives in `frontend/mobile/`.
+Install Node **24.18.x** and pnpm **11.17.0**, then from the repository root:
+
+```sh
+pnpm install --frozen-lockfile
+cp frontend/mobile/.env.example frontend/mobile/.env
+pnpm mobile
+```
+
+The default `fake` connector runs without a server. For HTTP, set
+`EXPO_PUBLIC_CONNECTOR_MODE=http` and `EXPO_PUBLIC_API_URL` to your API origin
+(e.g. `https://habits.example.com`, without `/api/v1`), then enter a dedicated PAT.
+OIDC uses a public PKCE client and a development build (`pnpm mobile:ios` or
+`pnpm mobile:android`); credentials are kept in native SecureStore. Email/password
+authentication is planned for a later iteration. There is one technical screen,
+using native components, with all application API operations and JSON forms for
+advanced options. [Mobile setup, networking, OIDC and checks](docs/mobile.md).
+
+`pnpm typecheck`, `pnpm test:mobile` and `pnpm mobile:export` check the mobile app.
+For Compose configuration, copy `backend/.env.example` to the root `.env` if needed.
 
 ### Work on the HA client
 

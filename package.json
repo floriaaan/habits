@@ -1,0 +1,16 @@
+{
+  "name": "habits",
+  "private": true,
+  "packageManager": "pnpm@11.17.0",
+  "engines": {
+    "node": ">=24.18.0 <25"
+  },
+  "scripts": {
+    "mobile": "pnpm --filter @habits/mobile start",
+    "mobile:ios": "pnpm --filter @habits/mobile ios",
+    "mobile:android": "pnpm --filter @habits/mobile android",
+    "typecheck": "pnpm --filter @habits/mobile typecheck",
+    "test:mobile": "pnpm --filter @habits/mobile test",
+    "mobile:export": "pnpm --filter @habits/mobile export"
+  }
+}

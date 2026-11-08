@@ -1,0 +1,273 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-06T00:02:47.725385+00:00",
+  "title": "Design System: Habits native",
+  "extensions": {
+    "colorMeta": {
+      "canvas": {
+        "role": "neutral",
+        "displayName": "Canvas"
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Surface"
+      },
+      "chip": {
+        "role": "neutral",
+        "displayName": "Chip"
+      },
+      "text": {
+        "role": "neutral",
+        "displayName": "Text"
+      },
+      "secondary": {
+        "role": "neutral",
+        "displayName": "Secondary"
+      },
+      "selected": {
+        "role": "neutral",
+        "displayName": "Selected"
+      },
+      "pink-start": {
+        "role": "secondary",
+        "displayName": "Pink start"
+      },
+      "pink-end": {
+        "role": "secondary",
+        "displayName": "Pink end"
+      },
+      "green-start": {
+        "role": "secondary",
+        "displayName": "Green start"
+      },
+      "green-end": {
+        "role": "secondary",
+        "displayName": "Green end"
+      },
+      "blue-start": {
+        "role": "primary",
+        "displayName": "Blue start"
+      },
+      "blue-end": {
+        "role": "primary",
+        "displayName": "Blue end"
+      },
+      "on-pastel": {
+        "role": "secondary",
+        "displayName": "On pastel"
+      },
+      "pink-text": {
+        "role": "secondary",
+        "displayName": "Pink text"
+      },
+      "green-text": {
+        "role": "secondary",
+        "displayName": "Green text"
+      },
+      "blue-text": {
+        "role": "primary",
+        "displayName": "Blue text"
+      },
+      "accent": {
+        "role": "secondary",
+        "displayName": "Accent"
+      },
+      "error": {
+        "role": "secondary",
+        "displayName": "Error"
+      },
+      "surface-dark": {
+        "role": "neutral",
+        "displayName": "Surface dark"
+      },
+      "chip-dark": {
+        "role": "neutral",
+        "displayName": "Chip dark"
+      },
+      "text-dark": {
+        "role": "neutral",
+        "displayName": "Text dark"
+      },
+      "secondary-dark": {
+        "role": "neutral",
+        "displayName": "Secondary dark"
+      },
+      "selected-dark": {
+        "role": "neutral",
+        "displayName": "Selected dark"
+      },
+      "pink-start-dark": {
+        "role": "secondary",
+        "displayName": "Pink start dark"
+      },
+      "pink-end-dark": {
+        "role": "secondary",
+        "displayName": "Pink end dark"
+      },
+      "green-start-dark": {
+        "role": "secondary",
+        "displayName": "Green start dark"
+      },
+      "green-end-dark": {
+        "role": "secondary",
+        "displayName": "Green end dark"
+      },
+      "blue-start-dark": {
+        "role": "primary",
+        "displayName": "Blue start dark"
+      },
+      "blue-end-dark": {
+        "role": "primary",
+        "displayName": "Blue end dark"
+      },
+      "on-pastel-dark": {
+        "role": "secondary",
+        "displayName": "On pastel dark"
+      },
+      "pink-text-dark": {
+        "role": "secondary",
+        "displayName": "Pink text dark"
+      },
+      "green-text-dark": {
+        "role": "secondary",
+        "displayName": "Green text dark"
+      },
+      "blue-text-dark": {
+        "role": "primary",
+        "displayName": "Blue text dark"
+      },
+      "accent-dark": {
+        "role": "secondary",
+        "displayName": "Accent dark"
+      },
+      "error-dark": {
+        "role": "secondary",
+        "displayName": "Error dark"
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Home title"
+      },
+      "page-title": {
+        "displayName": "Page title",
+        "purpose": "Shared page title"
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Metric-card heading"
+      },
+      "heading": {
+        "displayName": "Heading",
+        "purpose": "Secondary heading"
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Shared Copy default"
+      },
+      "caption": {
+        "displayName": "Caption",
+        "purpose": "Supporting label"
+      }
+    },
+    "shadows": [],
+    "motion": [],
+    "breakpoints": [
+      {
+        "name": "home-compact-width",
+        "value": "380 native logical points; compact below this width"
+      },
+      {
+        "name": "home-wide-top-minimum",
+        "value": "700 native logical points; upper-panel minimum 360 above this width"
+      }
+    ],
+    "nativeExteriorCorners": {
+      "curve": "continuous",
+      "iosPhoneRadius": "clamp(28, topSafeAreaInset - 6, 60)",
+      "phoneWidthBelow": 700,
+      "fallbackRadius": 28,
+      "appliesTo": [
+        "home.topLeft",
+        "home.topRight",
+        "dock.bottomLeft",
+        "dock.bottomRight"
+      ],
+      "note": "Approximation from safe area; not a physical display-radius API."
+    }
+  },
+  "components": [
+    {
+      "name": "Shared Button",
+      "kind": "button",
+      "refersTo": "button",
+      "description": "Light-scheme native Button translation; pressed and disabled opacity match native.",
+      "html": "<button class=\"ds-button\">Réessayer</button>",
+      "css": ".ds-button{background:#e7e7e7;color:#101213;border:0;border-radius:16px;padding:14px;min-height:48px;font:600 17px system-ui}.ds-button:active{opacity:.65}.ds-button:disabled{opacity:.45}"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "field",
+      "description": "Shared input styling; native platform focus behavior is not emulated.",
+      "html": "<input class=\"ds-field\" aria-label=\"Nom de l’habitude\" placeholder=\"Nom de l’habitude\">",
+      "css": ".ds-field{color:#101213;border:1px solid #899296;border-radius:14px;padding:12px;min-height:48px;font:17px system-ui}"
+    },
+    {
+      "name": "Metric Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Light progression surface, with native gradient and typography translated to CSS.",
+      "html": "<section class=\"ds-card\"><div>Progression</div><strong>—</strong><small>Objectif</small></section>",
+      "css": ".ds-card{background:linear-gradient(#ffe7ed,#f9c4d6);color:#121612;border-radius:26px;padding:16px;min-height:154px;font:600 20px system-ui;letter-spacing:-.4px;display:flex;flex-direction:column;justify-content:space-between}.ds-card small{font-size:15px;font-weight:400;color:#795460}"
+    },
+    {
+      "name": "Category Chip",
+      "kind": "chip",
+      "refersTo": "category-chip",
+      "description": "Static selected category example; values are illustrative placeholders.",
+      "html": "<button class=\"ds-chip\" aria-pressed=\"true\"><span>Sport</span><strong>—</strong></button>",
+      "css": ".ds-chip{background:#e7e7e7;color:#101213;border:0;border-radius:22px;padding:9px 8px;min-height:56px;display:flex;flex-direction:column;align-items:flex-start;font:12px system-ui}.ds-chip strong{font-size:20px;font-weight:600}.ds-chip:active{opacity:.65}"
+    },
+    {
+      "name": "Dock Surface",
+      "kind": "nav",
+      "refersTo": "dock",
+      "description": "Dock geometry preview; icon and system chrome are provided by native runtime, not HTML.",
+      "html": "<nav class=\"ds-dock\" aria-label=\"Navigation\"><div class=\"ds-links\"><span aria-current=\"page\">Accueil</span><span>Progression</span><span>Profil</span></div></nav>",
+      "css": ".ds-dock{background:#f8f8f8;color:#101213;border-radius:28px;padding:8px 28px 8px;font:14px system-ui}.ds-links{display:flex;justify-content:space-between;gap:8px}.ds-links span{min-height:48px;min-width:86px;display:flex;align-items:center;justify-content:center;border-radius:28px}.ds-links [aria-current]{background:#e7e7e7}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Approved V4 native card direction; no additional metaphor confirmed",
+    "overview": "Flat rounded surfaces on an anthracite canvas, native non-rounded system type and native symbols. Light and dark palettes follow the operating system. The V4 home composition is surface-specific.",
+    "keyCharacteristics": [
+      "Narrow dark gutters",
+      "Generous rounded surfaces",
+      "Native typography and symbols",
+      "Dynamic text and safe areas"
+    ],
+    "rules": [
+      {
+        "name": "The System Scheme Rule",
+        "body": "Use useTheme() for adaptive surfaces and text.",
+        "section": "colors"
+      },
+      {
+        "name": "The Native Type Rule",
+        "body": "Keep the standard platform face and allow large text to reshape layout.",
+        "section": "typography"
+      }
+    ],
+    "dos": [
+      "Do reuse the native theme and shared components.",
+      "Do preserve native safe areas, scaling and Expo Router."
+    ],
+    "donts": [
+      "Do not draw a fake home indicator.",
+      "Do not fabricate missing data.",
+      "Do not implement unchosen Today proposals."
+    ]
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "tool": "image_gen.imagegen",
+  "prompt": "Edit the FIRST image only: restore the thin black native iOS home gesture indicator centered at the very bottom INSIDE the ivory bottom dock, with native bottom safe-area spacing, matching the indicator in the SECOND original reference image. The first image accidentally omitted it. Preserve absolutely everything else in the first image: composition, all French text, date, numbers, matte ivory/pastel palette, orange outlined olive selected day, crisp black outlined controls, green checkmarks, icons, black gutters, card radii and exact layout. Do not change typography, introduce any extra shapes or text, or move content. Output one same-size flat portrait UI mockup.",
+  "references": [
+    ".impeccable/mocks/graphic-v1/today.png",
+    ".impeccable/mocks/today/sections.png"
+  ],
+  "approved": false,
+  "date": "2026-11-06",
+  "rejected": true,
+  "feedback": "Déjà trop marqué. Doit rester minimal, sobre et classe."
+}

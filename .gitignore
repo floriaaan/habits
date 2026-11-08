@@ -9,3 +9,11 @@ backups/
 __pycache__/
 *.py[cod]
 .task/
+
+node_modules/
+.expo/
+dist/
+frontend/mobile/ios/
+frontend/mobile/android/
+.env.local
+.env.*.local

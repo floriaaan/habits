@@ -1,0 +1,246 @@
+{
+  "tool": "build-phase",
+  "version": 2,
+  "startedAt": "2026-11-05T23:31:11.834Z",
+  "comp": ".impeccable/mocks/decision/dashboard-v4.png",
+  "direction": null,
+  "breakpoint": "883x1780",
+  "artifact": null,
+  "phase": "hero",
+  "phases": {
+    "comps": {
+      "status": "skipped",
+      "openedAt": null,
+      "closedAt": null,
+      "attempts": 0,
+      "notes": [
+        {
+          "at": "2026-11-05T23:31:11.834Z",
+          "text": "started with an approved comp; the comp round happened before this state (surface round or manual)"
+        }
+      ],
+      "gate": null,
+      "forced": null
+    },
+    "spec": {
+      "status": "closed",
+      "openedAt": "2026-11-05T23:31:11.834Z",
+      "closedAt": "2026-11-05T23:35:46.124Z",
+      "attempts": 6,
+      "notes": [],
+      "gate": {
+        "ok": true,
+        "reasons": [],
+        "summary": "29 regions, 0 plates, 10 text regions measured",
+        "at": "2026-11-05T23:35:46.124Z"
+      },
+      "forced": null
+    },
+    "plates": {
+      "status": "closed",
+      "openedAt": "2026-11-05T23:35:46.124Z",
+      "closedAt": "2026-11-05T23:35:46.482Z",
+      "attempts": 1,
+      "notes": [],
+      "gate": {
+        "ok": true,
+        "reasons": [],
+        "summary": "no plates owed",
+        "at": "2026-11-05T23:35:46.482Z"
+      },
+      "forced": null
+    },
+    "hero": {
+      "status": "open",
+      "openedAt": "2026-11-05T23:35:46.482Z",
+      "closedAt": null,
+      "attempts": 0,
+      "notes": [
+        {
+          "at": "2026-11-05T23:55:56.443Z",
+          "text": "Native first viewport implemented against approved V4. Current captures are iOS27 ExpoGo58; Android exports only. Pixel diff at native aspect ratio reports drift; no gate forced. Fresh native reviewer requested with all screenshots and known gaps."
+        },
+        {
+          "at": "2026-11-06T00:04:32.192Z",
+          "text": "Independent native review fix then focused ship: 4/4 requested fixes resolved. DESIGN.md and design.json extracted from implementation. Automated pixel gate remains unpassed at about68%; not forced. Standalone native gesture indicator and Android runtime still unverified. Review verdict saved .impeccable/review/verdict.md."
+        }
+      ],
+      "gate": {
+        "ok": false,
+        "reasons": [
+          "hero overall 67.8% < 72% (structure 48%, color 86%, detail 59%)",
+          "region system-top is missing (detail 14%, structure 53%): the comp shows material the build does not",
+          "region add is missing (detail 0%, structure 68%): the comp shows material the build does not",
+          "region progress-chart is missing (detail 4%, structure 74%): the comp shows material the build does not",
+          "region progress-value is missing (detail 7%, structure 54%): the comp shows material the build does not",
+          "region progress-caption is missing (detail 0%, structure 63%): the comp shows material the build does not",
+          "region progress-delta is missing (detail 7%, structure 58%): the comp shows material the build does not",
+          "region regularity-values is missing (detail 12%, structure 46%): the comp shows material the build does not",
+          "region water-period is missing (detail 0%, structure 24%): the comp shows material the build does not",
+          "region water-history is missing (detail 5%, structure 73%): the comp shows material the build does not",
+          "region water-caption is missing (detail 7%, structure 32%): the comp shows material the build does not",
+          "region water-value is missing (detail 3%, structure 28%): the comp shows material the build does not",
+          "region water-percent is missing (detail 0%, structure 55%): the comp shows material the build does not",
+          "region pagination is missing (detail 0%, structure 81%): the comp shows material the build does not",
+          "region tabs is missing (detail 0%, structure 41%): the comp shows material the build does not",
+          "region system-bottom is missing (detail 0%, structure 90%): the comp shows material the build does not",
+          "region progress-title (text) is contradicted (structure 45%, detail added 3%): the composition of this text region differs from the comp; re-derive it from the spec box",
+          "region regularity-title (text) is contradicted (structure 34%, detail added 25%): the composition of this text region differs from the comp; re-derive it from the spec box",
+          "control regularity-track drifts to 65% (structure 71%, color 87%): its chrome differs from the comp's; open .impeccable/review/diff/hero/regions/regularity-track.png and match the border, fill, radius, chevron or arrow, and label size",
+          "control water-fill drifts to 58% (structure 62%, color 77%): its chrome differs from the comp's; open .impeccable/review/diff/hero/regions/water-fill.png and match the border, fill, radius, chevron or arrow, and label size",
+          "region add: its ink sits in a 205x60px box in the comp and 49x11px in the build (padding, row height, or size); match the box, not only the position",
+          "READINGS, each one CSS edit (5):",
+          "text progress-value: ink is #e85b9a in the build, #0b0b0c in the comp; use the comp's colour",
+          "text progress-delta: ink is #ea5e9a in the build, #0b0a0c in the comp; use the comp's colour",
+          "text water-caption: ink is #081818 in the build, #265b7f in the comp; use the comp's colour",
+          "control water-period: its rule sits 70px into the box in the comp and 50px in the build (-20px), so the strip is shorter than the comp's; match the height, not only the position",
+          "control tabs: its ink is 97px tall in the build and 58px in the comp (+39px); match the height, not only the position"
+        ],
+        "summary": "hero 68% (drift)",
+        "score": 0.6777,
+        "verdict": "drift",
+        "report": ".impeccable/review/diff/hero/report.json",
+        "sideBySide": "/Users/floriaaan/.t3/worktrees/habits/t3-f751c5cc/frontend/mobile/.impeccable/review/diff/hero/side-by-side.png",
+        "worst": [
+          "water-period missing 22%",
+          "middle-water-gutter contradicted 31%",
+          "dock contradicted 32%"
+        ],
+        "worstIds": [
+          "water-period",
+          "middle-water-gutter",
+          "dock"
+        ],
+        "worstCrops": [
+          {
+            "id": "water-period",
+            "verdict": "missing",
+            "score": {
+              "overall": 0.2187,
+              "structure": 0.2383,
+              "color": 0.3186,
+              "colorIntersection": 0.0564,
+              "paletteMatch": 0.4598,
+              "detail": 0,
+              "detailRaw": 0.1206,
+              "detailAdded": 0.3125,
+              "bands": 0
+            },
+            "file": ".impeccable/review/diff/hero/regions/water-period.png"
+          },
+          {
+            "id": "middle-water-gutter",
+            "verdict": "contradicted",
+            "score": {
+              "overall": 0.3132,
+              "structure": 0.3629,
+              "color": 0.3363,
+              "colorIntersection": 0.0576,
+              "paletteMatch": 0.4864,
+              "detail": 0.2704,
+              "detailRaw": 0.5204,
+              "detailAdded": 0.5,
+              "bands": 0.23
+            },
+            "file": ".impeccable/review/diff/hero/regions/middle-water-gutter.png"
+          },
+          {
+            "id": "dock",
+            "verdict": "contradicted",
+            "score": {
+              "overall": 0.3214,
+              "structure": 0.3822,
+              "color": 0.7449,
+              "colorIntersection": 0.3306,
+              "paletteMatch": 0.9679,
+              "detail": 0.0057,
+              "detailRaw": 0.2193,
+              "detailAdded": 0.4271,
+              "bands": 0
+            },
+            "file": ".impeccable/review/diff/hero/regions/dock.png"
+          }
+        ],
+        "regionVerdicts": {
+          "system-top": "missing",
+          "title": "drift",
+          "streak": "drift",
+          "categories": "drift",
+          "habit-list": "drift",
+          "add": "missing",
+          "progress-card": "drift",
+          "progress-title": "contradicted",
+          "progress-chart": "missing",
+          "progress-value": "missing",
+          "progress-caption": "missing",
+          "progress-delta": "missing",
+          "regularity-card": "drift",
+          "regularity-title": "contradicted",
+          "regularity-track": "drift",
+          "regularity-values": "missing",
+          "water-card": "contradicted",
+          "water-period": "missing",
+          "water-history": "missing",
+          "water-caption": "missing",
+          "water-fill": "drift",
+          "water-value": "missing",
+          "water-percent": "missing",
+          "dock": "contradicted",
+          "pagination": "missing",
+          "tabs": "missing",
+          "system-bottom": "missing",
+          "home-surface": "drift",
+          "middle-water-gutter": "contradicted"
+        },
+        "at": "2026-11-05T23:59:00.331Z"
+      },
+      "forced": null,
+      "readingsSeen": {
+        "text progress-value: ink is #e85b9a in the build, #0b0b0c in the comp; use the comp's colour": 1,
+        "text progress-delta: ink is #ea5e9a in the build, #0b0a0c in the comp; use the comp's colour": 1,
+        "text water-caption: ink is #081818 in the build, #265b7f in the comp; use the comp's colour": 1,
+        "control water-period: its rule sits 70px into the box in the comp and 50px in the build (-20px), so the strip is shorter than the comp's; match the height, not only the position": 1,
+        "control tabs: its ink is 97px tall in the build and 58px in the comp (+39px); match the height, not only the position": 1
+      },
+      "records": 1
+    },
+    "sections": {
+      "status": "pending",
+      "openedAt": null,
+      "closedAt": null,
+      "attempts": 0,
+      "notes": [],
+      "gate": null,
+      "forced": null
+    },
+    "motion": {
+      "status": "pending",
+      "openedAt": null,
+      "closedAt": null,
+      "attempts": 0,
+      "notes": [],
+      "gate": null,
+      "forced": null
+    },
+    "responsive": {
+      "status": "pending",
+      "openedAt": null,
+      "closedAt": null,
+      "attempts": 0,
+      "notes": [],
+      "gate": null,
+      "forced": null
+    },
+    "review": {
+      "status": "pending",
+      "openedAt": null,
+      "closedAt": null,
+      "attempts": 0,
+      "notes": [],
+      "gate": null,
+      "forced": null
+    }
+  },
+  "finish": null,
+  "plates": {}
+}
