@@ -99,6 +99,12 @@ components:
 ---
 # Design System: Habits native
 
+The profile integration menu uses the approved C proposal: a native form sheet
+above the profile, with a grabber, a close control and two detents (50% and 85%).
+Strava and Home Assistant retain their original service icons and colors;
+the surrounding surface, labels and connection states follow the app theme.
+Service settings replace the list inside the same sheet and provide a back control.
+
 ## Overview
 
 Habits uses a flat, close-set family of rounded surfaces, native symbols and standard system type. This documents the implemented Expo / React Native system, with the user-approved V4 home as its current expression. The visual direction is the approved card composition; no additional creative metaphor has been confirmed.

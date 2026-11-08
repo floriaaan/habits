@@ -160,6 +160,16 @@ La proposition A est intégrée dans `ProfileScreen`, accessible par l’onglet 
 
 Le profil réutilise les thèmes, les marges physiques, le dock et les transitions existants. La référence visuelle reste dans `frontend/mobile/.impeccable/mocks/profile-v1/`. Le rendu, les alertes natives, VoiceOver et le texte agrandi restent à vérifier sur appareil, sans simulateur utilisé pour cette tranche.
 
+### Intégrations — C « Panneau depuis le profil »
+
+L’entrée « Intégrations » du profil ouvre `/integrations` dans une feuille native, avec poignée, fermeture et deux hauteurs (50 % et 85 %). Les icônes originales de Strava et Home Assistant sont embarquées localement ; leur provenance figure dans `src/presentation/features/profile/assets/README.md`.
+
+La liste et les actions nécessitent `integrations:manage`. Les statuts proviennent du connecteur, avec chargement, erreur et réessai explicites. Un service ouvre ses actions dans le même panneau : autorisation Strava dans le navigateur, demande de synchronisation en arrière-plan, connexion Home Assistant par jeton longue durée, et déconnexion confirmée. L’adresse Home Assistant reste configurée côté serveur. Les associations sport/habitude restent dans les outils avancés.
+
+Le jeton est masqué, conservé uniquement dans le formulaire et effacé avant envoi, lors du changement de service ou du passage en arrière-plan. Il n’entre pas dans le cache des mutations. L’URL d’autorisation Strava est validée avant ouverture ; les statuts sont relus au retour dans l’application. Le mode démo utilise les connecteurs simulés sans ouvrir Strava.
+
+TypeScript, tests mobiles et exports iOS/Android vérifiés. Le rendu natif et les interactions restent à vérifier : Expo Go est arrêté sur sa confirmation d’ouverture, et l’accès agent aux appareils est désactivé dans cet environnement.
+
 
 ## Progression B avec régularité et catégories de A
 

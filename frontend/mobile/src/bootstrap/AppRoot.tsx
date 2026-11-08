@@ -80,6 +80,16 @@ export default function RootLayout() {
                     name="new"
                     options={{ headerShown: false, presentation: 'modal' }}
                   />
+                  <Stack.Screen
+                    name="integrations"
+                    options={{
+                      presentation: 'formSheet',
+                      sheetAllowedDetents: [0.5, 0.85],
+                      sheetGrabberVisible: true,
+                      sheetCornerRadius: 30,
+                      sheetExpandsWhenScrolledToEdge: true,
+                    }}
+                  />
                 </Stack>
               </HabitMorphProvider>
             </TabCardMotionProvider>

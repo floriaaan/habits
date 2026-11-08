@@ -225,6 +225,12 @@ export function ProfileView({ model }: { model: ProfileController }) {
               onPress={chooseAppearance}
             />
             <ProfileRow
+              icon={{ ios: 'square.grid.2x2', android: 'grid_view' }}
+              label="Intégrations"
+              disabled={working}
+              onPress={() => router.push('/integrations')}
+            />
+            <ProfileRow
               icon={{ ios: 'link', android: 'link' }}
               label="Connexion"
               value={isDemo ? 'Démo' : 'Session active'}
