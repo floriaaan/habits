@@ -1,0 +1,72 @@
+{
+  "title": "Habits — choisir la composition",
+  "question": "Quelle piste souhaites-tu poursuivre ? Tu peux en retenir une, combiner leurs points forts ou demander une révision. Données de démonstration ; aucune maquette n’est encore approuvée.",
+  "options": [
+    {
+      "id": "day",
+      "label": "Le fil du jour",
+      "thesis": "Un bilan compact puis les habitudes organisées par moment de la journée.",
+      "viewport": "Bilan hebdomadaire en haut ; actions du matin et de la soirée ; hydratation en bas.",
+      "risk": "Les habitudes sans horaire doivent rester faciles à trouver.",
+      "comp": ".impeccable/mocks/decision/day.png",
+      "palette": [
+        "#f6f6f4",
+        "#151515",
+        "#f8c6d5",
+        "#deefc8",
+        "#cce8ff",
+        "#82b74f"
+      ],
+      "materials": [
+        "Surfaces pastel douces",
+        "Typographie native arrondie"
+      ]
+    },
+    {
+      "id": "dashboard",
+      "label": "Le tableau de bord",
+      "thesis": "Actions et statistiques se répondent dans les grands blocs pastel de la référence.",
+      "viewport": "Catégories et habitudes en haut ; progression et série en duo ; hydratation pleine largeur.",
+      "risk": "Les modules doivent rester lisibles quand le texte est agrandi.",
+      "comp": ".impeccable/mocks/decision/dashboard.png",
+      "palette": [
+        "#f6f6f4",
+        "#151515",
+        "#f8c6d5",
+        "#deefc8",
+        "#cce8ff",
+        "#82b74f"
+      ],
+      "materials": [
+        "Surfaces pastel douces",
+        "Typographie native arrondie"
+      ]
+    },
+    {
+      "id": "categories",
+      "label": "Les univers",
+      "thesis": "Chaque catégorie réunit les habitudes à faire et leur progression.",
+      "viewport": "Quatre familles colorées ; actions intégrées à chaque groupe ; bilan de semaine compact.",
+      "risk": "L’ordre des catégories doit permettre de trouver rapidement les actions urgentes.",
+      "comp": ".impeccable/mocks/decision/categories.png",
+      "palette": [
+        "#f6f6f4",
+        "#151515",
+        "#f8c6d5",
+        "#deefc8",
+        "#cce8ff",
+        "#82b74f"
+      ],
+      "materials": [
+        "Surfaces pastel douces",
+        "Typographie native arrondie"
+      ]
+    }
+  ],
+  "reroll": true,
+  "steer": true,
+  "buildPath": {
+    "value": "comp",
+    "toggle": true
+  }
+}

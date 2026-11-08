@@ -1,0 +1,17 @@
+{
+  "prompt": "Use case: ui-mockup. Create one high-fidelity portrait mobile app screen, 1024x2048 composition, for the French habit tracker \"Habits\". This is concept B, \"Le tableau de bord\". The supplied image is a VISUAL REFERENCE only: faithfully retain its gorgeous rounded bold black typography, airy off-white ground, white large top panel, large pink/green/sky-blue rounded blocks, generous circular pictograms and playful polish. Build an evolved realistic native app dashboard, not a photocopy. Output only a flat screen edge to edge, straight-on, no phone frame, no photographic surroundings, no concept caption outside the UI. Native iPhone safe areas, status 9:41, home indicator.\nCOMPOSITION:\n- Top 42 percent: \"Habits\" large rounded title and small warm amber streak pill \"3 jours\". Then four small equal-width category chips \"Sport\", \"Esprit\", \"Quotidien\", \"Alimentation\"; show percentages 60 %, 100 %, 0 %, 71 % rather than meaningless XP fractions. Compact, high-contrast native typography; categories fit without clipping. Below, three action rows: pink runner icon and \"Course à pied\" / \"3 / 5 km\" / round plus button; green completed check and \"Méditer\" / \"10 / 10 min\"; purple book icon and \"Lire\" / \"1 / 1 séance\" / completed check. A clear modest green \"+ Ajouter\" action is attached to the list, not a floating overlay.\n- Middle 25 percent: two generously rounded equal-height pastel panels side by side, PINK left \"Progression\" with a restrained upward weekly sparkline, big \"58 %\", subtitle \"des objectifs\", small \"+6 pts\" / \"vs hier\". GREEN right \"Régularité\" with seven simple day dots, big \"3 jours\", subtitle \"de suite\". These are habit statistics, not activity/steps or calorie claims. Balance both cards, not a massive hero statistic.\n- Lower 24 percent: one SKY-BLUE full-width hydration module, \"Hydratation\" at top left and small \"Aujourd’hui\" at top right. Four simple flat water glasses across the lower left with differing blue fill. Big \"1,5 L\", subtitle \"sur 2 L · 75 %\", and a green \"+ 250 mL\" actual pill action at lower right. Rounded material and composition follow the source without busy shadows or a faux 3D dashboard.\n- Bottom 9 percent: native-style bottom navigation, three destinations with tasteful consistent outlined icons: \"Aujourd’hui\" selected green, \"Progrès\", \"Profil\". Quiet fine separation, not a thick black band.\nPalette: soft white/off-white, pale pink, pistachio green, pale sky-blue, lively green as interactive accent, nearly black text. Keep rounded black type and a highly legible functional hierarchy, medium density, no overflowing text. No calorie metrics, no pedometer, no heart rate, no AI sparkle tab, no promotional slogans. Statistics and actions should have equal importance. All numeric content is fictional demonstration data. Render a carefully art-directed real app screen with crisp French UI text and believable native tap targets.",
+  "tool": "image_gen.imagegen",
+  "reference": "../../references/habits-reference.png",
+  "concept": "Le tableau de bord",
+  "seed": "91b5aa69",
+  "approved": true,
+  "data": "Fictional demonstration data",
+  "approval": {
+    "source": "impeccable serve-question habits-mobile-layout",
+    "optionId": "dashboard",
+    "buildPath": "comp",
+    "buildPathFlipped": false
+  },
+  "composition_revision": "dashboard-v2.png",
+  "approval_scope": "Historical B selection; superseded for composition by user feedback on 2026-11-06"
+}

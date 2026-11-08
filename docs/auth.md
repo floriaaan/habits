@@ -1,5 +1,10 @@
 # Authentification configurable
 
+Les commandes Cargo de ce guide se lancent depuis `backend/`. Exporter
+`DATABASE_PATH=../data/habits.sqlite` pour réutiliser la base locale à la racine
+(les conteneurs conservent leur chemin `/data/habits.sqlite`). Pour la connexion
+mobile PAT/OIDC, consulter [le guide mobile](mobile.md).
+
 `AUTH_MODE=disabled` est le défaut : toutes les routes `/api/v1` répondent 401,
 même avec un token. Les healthchecks et les endpoints OAuth/webhook dédiés suivent
 leurs propres règles. Aucun en-tête d'identité fourni par un proxy ne confère de
@@ -143,3 +148,10 @@ comptes de service, signature/claims et rotation/panne JWKS via HTTP de test.
 Consulter `docs/validation.md` pour les résultats effectivement obtenus. Ces tests
 ne prouvent pas une compatibilité Pocket ID en production. Les secrets des
 connecteurs et leurs limites sont décrits dans [integrations.md](integrations.md).
+
+## Session du client mobile
+
+`GET /api/v1/session` utilise le middleware existant et ne nécessite aucun scope
+métier. Il renvoie `user_id`, `mode` (`personal_access_token`, `service_account` ou
+`oidc_access_token`) et les `scopes` effectifs, sans secret, avec `Cache-Control: no-store`.
+Un credential invalide, expiré/révoqué ou le mode disabled produit 401.

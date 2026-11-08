@@ -1,0 +1,8 @@
+{
+  "tool": "image_gen.imagegen",
+  "prompt": "Edit this Habits V4 app home UI with an EXTREMELY SUBTLE refinement toward minimal, sober, elegant native design. The user explicitly rejected the recent neo-brutalist proposal as already too strong. Use ONLY this approved original V4 image as the edit target and visual authority. Preserve exact composition, all card positions and sizes, black narrow gutters, white upper card, two pastel middle cards, blue hydration card, unified white dock containing dots, three icons and native home indicator. Preserve every French label and number. Keep the existing non-rounded standard native sans typography and generous rounded corners. Change only the surface finish: make white more neutral and clean, remove cloudy/glossy texture and most gradient depth, slightly mute the pink/green/blue pastel saturation, use very fine restrained chart strokes and clean precise small native symbols. Inner controls remain simple and quiet. The result should look almost the same as the original at first glance, just calmer and more refined. No black button borders, no outlines around category chips, no orange accent, no olive palette, no warm beige cast, no neon or oversized checkmarks, no extra completion marks, no hard shadows, no bold separators, no boxes around habit rows, no extra copy or controls. Do not make the typography heavier. This is minimal premium native software, not brutalism. Flat portrait screen, no physical phone or perspective. Retain the real native status bar and bottom gesture indicator inside the white dock.",
+  "reference": ".impeccable/mocks/decision/dashboard-v4.png",
+  "approved": false,
+  "date": "2026-11-06",
+  "direction": "minimal, sobre et classe"
+}

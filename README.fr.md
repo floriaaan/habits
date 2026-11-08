@@ -9,7 +9,7 @@ activité sportive, enregistrez vos réalisations et consultez objectifs, série
 statistiques et XP. Les habitudes booléennes, quantitatives, de durée et de fréquence
 prennent en charge planifications, jours de repos et fuseaux horaires IANA.
 
-Utilisez l'API depuis vos scripts ou connectez
+Utilisez [le client mobile Expo](docs/mobile.md), appelez l'API depuis vos scripts ou connectez
 [l'intégration et les cartes Home Assistant](https://github.com/floriaaan/habit-tracker-ha).
 Pocket ID/OIDC, Strava et les notifications sortantes vers HA sont facultatifs.
 Le backend ne fournit pas d'interface web autonome.
@@ -245,17 +245,19 @@ task dev:shell
 ### Développer avec Rust sur l'hôte
 
 Installez Rust **1.99.1**, un compilateur C et CMake. Les dépendances sont fixées
-dans `Cargo.lock`. `cargo run` ne charge pas `.env` ; exportez les variables nécessaires.
+dans `backend/Cargo.lock`. `cargo run` ne charge pas `.env` ; exportez les variables nécessaires.
 
 ```sh
-AUTH_MODE=local cargo run --locked
+cd backend
+AUTH_MODE=local DATABASE_PATH=../data/habits.sqlite cargo run --locked
 cargo fmt --all -- --check
 cargo clippy --locked --all-targets --all-features -- -D warnings
 cargo test --locked --all-targets
 cargo build --locked --release
+cd ..
 ```
 
-Le `compose.yaml` du dépôt construit localement ; le bloc ci-dessus utilise GHCR. `python3 scripts/docker_smoke.py` teste un build et un volume
+Le `compose.yaml` du dépôt construit localement ; le bloc ci-dessus utilise GHCR. `python3 backend/scripts/docker_smoke.py` teste un build et un volume
 temporaires distincts. La CI vérifie aussi audit/deny, OpenAPI, les frontières du
 domaine et les deux plateformes d'images natives.
 
@@ -453,3 +455,27 @@ se configure avec l'URL du **backend** et un token **Habit Tracker**, depuis l'U
 [Validation](docs/validation.md) · [Tâches MVP](TODO-MVP.md)
 
 Licence MIT — [LICENSE](LICENSE).
+
+## Application mobile (Expo)
+
+Le serveur Rust est dans `backend/` et le client Expo dans `frontend/mobile/`.
+Installez Node **24.18.x** et pnpm **11.17.0**, puis depuis la racine :
+
+```sh
+pnpm install --frozen-lockfile
+cp frontend/mobile/.env.example frontend/mobile/.env
+pnpm mobile
+```
+
+Le connector `fake` par défaut fonctionne sans serveur. Pour HTTP, configurez
+`EXPO_PUBLIC_CONNECTOR_MODE=http` et `EXPO_PUBLIC_API_URL` avec l'origine de l'API
+(par exemple `https://habits.example.com`, sans `/api/v1`), puis saisissez un PAT dédié.
+OIDC utilise un client public PKCE et un development build (`pnpm mobile:ios` ou
+`pnpm mobile:android`) ; les credentials restent dans SecureStore natif.
+L'auth email/mot de passe est prévue pour une prochaine itération. L'écran
+technique unique utilise les composants natifs et expose les opérations API,
+avec des formulaires JSON pour les options avancées.
+[Installation mobile, réseau, OIDC et vérifications](docs/mobile.md).
+
+`pnpm typecheck`, `pnpm test:mobile` et `pnpm mobile:export` vérifient le client.
+Pour configurer Compose, copiez au besoin `backend/.env.example` vers `.env` racine.

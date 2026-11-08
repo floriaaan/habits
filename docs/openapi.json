@@ -2320,6 +2320,39 @@
         ]
       }
     },
+    "/api/v1/session": {
+      "get": {
+        "tags": [
+          "super::auth"
+        ],
+        "operationId": "session",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Session"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/tokens": {
       "get": {
         "tags": [
@@ -3824,6 +3857,38 @@
             "format": "date-time"
           }
         }
+      },
+      "Session": {
+        "type": "object",
+        "description": "Public view of the authenticated principal; never serializes credentials.",
+        "required": [
+          "user_id",
+          "mode",
+          "scopes"
+        ],
+        "properties": {
+          "mode": {
+            "$ref": "#/components/schemas/SessionMode"
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Scope"
+            }
+          },
+          "user_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "SessionMode": {
+        "type": "string",
+        "enum": [
+          "personal_access_token",
+          "service_account",
+          "oidc_access_token"
+        ]
       },
       "Sport": {
         "type": "string",

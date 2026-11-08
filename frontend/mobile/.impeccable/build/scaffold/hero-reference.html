@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Scaffold reference: dashboard-v4.png</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Yantramanav:wght@700&family=Andika:wght@700&display=swap">
+  <link rel="stylesheet" href="layout.css">
+  <style>html,body{margin:0}body{background:#f1f3f6}.region{box-sizing:border-box}.region.text p{white-space:pre-wrap}</style>
+</head>
+<body>
+<!-- Reference only. Every region sits at its measured box inside a comp-aspect frame. Take the boxes (layout.css), keep your own semantic structure. -->
+<main class="comp-frame" style="max-width:883px">
+  <div class="r-system-top region chrome" data-region="system-top"><!-- Native status area on white surface --></div>
+  <div class="r-title region text" data-region="title"><!-- Habits, standard non-rounded native sans-serif semibold --><p style="font-size:var(--r-title-font);font-family:var(--r-title-family),sans-serif;font-weight:var(--r-title-weight);line-height:1.05;margin:0">title</p></div>
+  <div class="r-streak region control" data-region="streak"><!-- Pale amber streak button, native flame symbol and count: rebuild the control's chrome from the crop (comp-spec.mjs --crop streak); its ink box, border, fill, radius, and label size are the comp's --></div>
+  <div class="r-categories region control" data-region="categories"><!-- Four native selectable category pills with labels and percentages: rebuild the control's chrome from the crop (comp-spec.mjs --crop categories); its ink box, border, fill, radius, and label size are the comp's --></div>
+  <div class="r-habit-list region control" data-region="habit-list"><!-- Three native actionable habit rows, colored platform symbols and secondary progress text: rebuild the control's chrome from the crop (comp-spec.mjs --crop habit-list); its ink box, border, fill, radius, and label size are the comp's --></div>
+  <div class="r-add region control" data-region="add"><!-- Compact white Ajouter button with green plus: rebuild the control's chrome from the crop (comp-spec.mjs --crop add); its ink box, border, fill, radius, and label size are the comp's --></div>
+  <div class="r-progress-card region chrome" data-region="progress-card"><!-- Flat rounded pink card surface --></div>
+  <div class="r-progress-title region text" data-region="progress-title"><!-- Progression heading --><p style="font-size:var(--r-progress-title-font);line-height:1.05;margin:0">progress-title</p></div>
+  <div class="r-progress-chart region control" data-region="progress-chart"><!-- Interactive trend line based on real daily percentages: rebuild the control's chrome from the crop (comp-spec.mjs --crop progress-chart); its ink box, border, fill, radius, and label size are the comp's --></div>
+  <div class="r-progress-value region text" data-region="progress-value"><!-- 58 % in semibold tabular native digits --><p style="font-size:var(--r-progress-value-font);line-height:1.05;margin:0">progress-value</p></div>
+  <div class="r-progress-caption region text" data-region="progress-caption"><!-- Objectif label --><p style="font-size:var(--r-progress-caption-font);line-height:1.05;margin:0">progress-caption</p></div>
+  <div class="r-progress-delta region text" data-region="progress-delta"><!-- Positive or negative daily change and vs hier label --><p style="font-size:var(--r-progress-delta-font);line-height:1.05;margin:0">progress-delta</p></div>
+  <div class="r-regularity-card region chrome" data-region="regularity-card"><!-- Flat rounded pale green card surface --></div>
+  <div class="r-regularity-title region text" data-region="regularity-title"><!-- Régularité and Cette semaine --><p style="font-size:var(--r-regularity-title-font);line-height:1.05;margin:0">regularity-title</p></div>
+  <div class="r-regularity-track region control" data-region="regularity-track"><!-- Semantic weekly consistency progress track: rebuild the control's chrome from the crop (comp-spec.mjs --crop regularity-track); its ink box, border, fill, radius, and label size are the comp's --></div>
+  <div class="r-regularity-values region text" data-region="regularity-values"><!-- 3 jours de suite and 120 XP cumulés --><p style="font-size:var(--r-regularity-values-font);line-height:1.05;margin:0">regularity-values</p></div>
+  <div class="r-water-card region chrome" data-region="water-card"><!-- Flat rounded pale blue card surface --></div>
+  <div class="r-water-period region control" data-region="water-period"><!-- Native Semaine Mois segmented control: rebuild the control's chrome from the crop (comp-spec.mjs --crop water-period); its ink box, border, fill, radius, and label size are the comp's --></div>
+  <div class="r-water-history region control" data-region="water-history"><!-- Seven historical percentage cells, data-driven countable shapes: rebuild the control's chrome from the crop (comp-spec.mjs --crop water-history); its ink box, border, fill, radius, and label size are the comp's --></div>
+  <div class="r-water-caption region text" data-region="water-caption"><!-- Hydratation label --><p style="font-size:var(--r-water-caption-font);line-height:1.05;margin:0">water-caption</p></div>
+  <div class="r-water-fill region control" data-region="water-fill"><!-- Five countable volume indicators, two rectangular bottles and three glasses, filled from actual volume: rebuild the control's chrome from the crop (comp-spec.mjs --crop water-fill); its ink box, border, fill, radius, and label size are the comp's --></div>
+  <div class="r-water-value region text" data-region="water-value"><!-- 1,5 L current volume --><p style="font-size:var(--r-water-value-font);font-family:var(--r-water-value-family),sans-serif;font-weight:var(--r-water-value-weight);line-height:1.05;margin:0">water-value</p></div>
+  <div class="r-water-percent region text" data-region="water-percent"><!-- 75 % de l’objectif --><p style="font-size:var(--r-water-percent-font);line-height:1.05;margin:0">water-percent</p></div>
+  <div class="r-dock region chrome" data-region="dock"><!-- Independent white rounded dock surface includes native safe area --></div>
+  <div class="r-pagination region control" data-region="pagination"><!-- Pagination controls reflecting actual habit pages: rebuild the control's chrome from the crop (comp-spec.mjs --crop pagination); its ink box, border, fill, radius, and label size are the comp's --></div>
+  <div class="r-tabs region control" data-region="tabs"><!-- Three native tab controls: Today, Progress, Profile: rebuild the control's chrome from the crop (comp-spec.mjs --crop tabs); its ink box, border, fill, radius, and label size are the comp's --></div>
+  <div class="r-system-bottom region chrome" data-region="system-bottom"><!-- Native system safe area on white background --></div>
+  <div class="r-home-surface region chrome" data-region="home-surface"><!-- Continuous off-white home card --></div>
+  <div class="r-middle-water-gutter region chrome" data-region="middle-water-gutter"><!-- Black spacing between middle cards and hydration --></div>
+</main>
+</body>
+</html>

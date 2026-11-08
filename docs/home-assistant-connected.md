@@ -250,7 +250,7 @@ cargo build --locked
 git submodule update --init --recursive
 python3.14 -m venv /tmp/habits-ha-tests
 /tmp/habits-ha-tests/bin/pip install homeassistant==2026.10.2 home-assistant-frontend==20260930.4
-HABIT_TRACKER_BIN="$PWD/target/debug/habit-tracker" \
+HABIT_TRACKER_BIN="$PWD/backend/target/debug/habit-tracker" \
   /tmp/habits-ha-tests/bin/python -m unittest discover -s tests -p test_home_assistant.py -v
 ```
 
